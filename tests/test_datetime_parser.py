@@ -27,6 +27,12 @@ def test_time_only_does_not_invent_date():
     assert result.time_value == time(12, 0)
 
 
+def test_time_words_are_parsed_in_clarification_replies():
+    assert parse_datetime_parts("12 утра", NOW).time_value == time(12, 0)
+    assert parse_datetime_parts("6 вечера", NOW).time_value == time(18, 0)
+    assert parse_datetime_parts("12 часов", NOW).time_value == time(12, 0)
+
+
 def test_invalid_calendar_date_is_reported():
     result = parse_datetime_parts("31.02.2026 в 12:00", NOW)
 

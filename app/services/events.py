@@ -57,9 +57,9 @@ class EventService:
         moment = Event.starts_at
         fallback_moment = Event.due_at
         date_only = Event.due_date
-        conditions = [
-            or_(Event.owner_session_id == session_id, Event.owner_session_id.is_(None))
-        ]
+        # Seed/demo rows are not personal data and must not leak into an
+        # anonymous user's lists or search results.
+        conditions = [Event.owner_session_id == session_id]
         if event_type:
             conditions.append(Event.type == event_type.value)
         event_date = func.substr(func.coalesce(moment, fallback_moment, date_only), 1, 10)

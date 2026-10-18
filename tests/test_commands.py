@@ -400,3 +400,21 @@ def test_past_meeting_date_is_reported_before_missing_time():
 
     assert result.missing_fields == ["past_date"]
     assert result.clarification_question == "Указанная дата уже прошла. Укажите будущую дату."
+
+
+def test_past_task_date_is_rejected():
+    command = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Поставь задачу на 10 октября",
+        title="Сделать отчет",
+        event_type=EventType.TASK,
+        due_date=datetime.fromisoformat("2026-10-10").date(),
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-15T12:00:00+03:00")
+    )
+
+    assert result.missing_fields == ["past_date"]
+    assert result.due_date == datetime.fromisoformat("2026-10-10").date()
+    assert result.clarification_question == "Указанная дата уже прошла. Укажите будущую дату."

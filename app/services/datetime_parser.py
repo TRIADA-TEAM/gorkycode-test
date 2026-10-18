@@ -124,7 +124,7 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         time_value = time(int(clock.group(1)), int(clock.group(2)))
     else:
         hour = re.search(
-            r"\bв\s+([01]?\d|2[0-3])(?:\s+час(?:а|ов)?)?\s*(утра|дня|вечера)?\b",
+            r"(?:\bв\s+|^|\s)([01]?\d|2[0-3])(?:\s+час(?:а|ов)?)?\s*(утра|дня|вечера)?\b",
             time_text,
         )
         if hour:
