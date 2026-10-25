@@ -213,6 +213,33 @@ def test_delete_uses_explicit_date_to_select_same_named_event(db):
     assert assistant.events.get_owned(session_id, second.id).status == EventStatus.PENDING.value
 
 
+def test_explicit_date_filters_model_candidate_ids_before_delete(db):
+    session_id = str(uuid4())
+    assistant = service(db)
+    first = assistant.execute(
+        session_id, meeting_command("Встреча с командой", 26, 15), "user_text"
+    ).created_event
+    second = assistant.execute(
+        session_id, meeting_command("Встреча с командой", 27, 15), "user_text"
+    ).created_event
+
+    result = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.DELETE_EVENT,
+            transcript="Удали встречу с командой, которая 26.10.26 в 16:00",
+            candidate_event_ids=[first.id, second.id],
+            event_type=EventType.MEETING,
+        ),
+        "user_text",
+    )
+
+    assert result.needs_clarification is False
+    assert result.created_event.id == first.id
+    assert assistant.events.get_owned(session_id, first.id).status == EventStatus.CANCELLED.value
+    assert assistant.events.get_owned(session_id, second.id).status == EventStatus.PENDING.value
+
+
 def test_cancel_phrase_clears_pending_without_calling_model(db):
     session_id = str(uuid4())
     model = ScriptedClient([])

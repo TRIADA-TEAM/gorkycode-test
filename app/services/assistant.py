@@ -356,22 +356,23 @@ class AssistantService:
     def _resolve_target_events(self, session_id: str, command: AssistantCommand):
         if command.target_event_id:
             event = self.events.get_owned(session_id, command.target_event_id)
-            return [event] if event and event.status != EventStatus.CANCELLED.value else []
-        if command.candidate_event_ids:
-            return [
+            candidates = [event] if event and event.status != EventStatus.CANCELLED.value else []
+        elif command.candidate_event_ids:
+            candidates = [
                 event
                 for event_id in command.candidate_event_ids
                 if (event := self.events.get_owned(session_id, event_id))
                 and event.status != EventStatus.CANCELLED.value
             ]
-        if self._has_reference_pronoun(command.transcript):
+        elif self._has_reference_pronoun(command.transcript):
             event_id = self.dialogue.get_last_referenced_event_id(session_id)
             event = self.events.get_owned(session_id, event_id) if event_id else None
-            return [event] if event and event.status != EventStatus.CANCELLED.value else []
-        query = command.target_query or command.query or command.title or ""
-        candidates = self.events.search_events(
-            session_id, query, event_type=command.event_type, limit=5
-        )
+            candidates = [event] if event and event.status != EventStatus.CANCELLED.value else []
+        else:
+            query = command.target_query or command.query or command.title or ""
+            candidates = self.events.search_events(
+                session_id, query, event_type=command.event_type, limit=5
+            )
         # A date in a delete/complete request identifies the target event; do not
         # force the user to choose a number between same-named events on other dates.
         if command.action in {Action.DELETE_EVENT, Action.COMPLETE_EVENT}:
