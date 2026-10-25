@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     gigachat_api_url: str = "https://api.giga.chat/v1"
     gigachat_verify_ssl: bool = True
 
+    polza_api_key: str = ""
+    polza_api_url: str = "https://polza.ai/api/v1"
+    polza_stt_model: str = "openai/whisper-large-v3-turbo"
+    polza_stt_language: str = "ru"
+    polza_stt_timeout: float = 60.0
+    polza_stt_max_retries: int = 3
+
     max_audio_bytes: int = 10 * 1024 * 1024
     import_seed: bool = False
 

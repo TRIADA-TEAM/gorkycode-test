@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.db.session import get_db
 from app.domain.commands import AssistantResponse, EventResponse, EventType, TextRequest
 from app.integrations.gigachat import GigaChatClient, GigaChatError
+from app.integrations.polza import PolzaTranscriptionClient, TranscriptionError
 from app.services.assistant import AssistantService
 from app.services.events import EventService
 
@@ -23,7 +24,12 @@ ALLOWED_AUDIO_TYPES = {
 
 def assistant_service(db: Session) -> AssistantService:
     settings = get_settings()
-    return AssistantService(db, settings, GigaChatClient(settings))
+    return AssistantService(
+        db,
+        settings,
+        GigaChatClient(settings),
+        transcription_client=PolzaTranscriptionClient(settings),
+    )
 
 
 @router.get("/health")
@@ -68,6 +74,8 @@ async def assistant_audio(
         )
     except GigaChatError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except TranscriptionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Unhandled audio assistant error")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка обработки запроса") from exc

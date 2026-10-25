@@ -41,7 +41,8 @@ Out of scope for the first version:
 - Deployment: a simple VPS with persistent disk and HTTPS.
 - LLM/NLU: GigaChat API.
 - Voice input: record a short audio file in the browser, upload it to the
-  backend, upload it to GigaChat file storage, and attach it to a chat request.
+  backend, transcribe it with Polza Whisper Turbo, and pass the resulting text
+  through the same GigaChat interpretation flow as typed input.
 - UI: a minimal web page with a record button, text input, dialogue history,
   and visible event results.
 - Time zone: `Europe/Moscow` until the product rules are revisited.
@@ -55,19 +56,14 @@ for new individual customers is unavailable and Freemium renewal has stopped.
 
 Current GigaChat API documentation confirms:
 
-- audio can be uploaded to `POST /files` with `purpose=general`;
-- supported audio includes MP3, MP4, M4A, WAV, WebM, OGG, and Opus;
-- one audio file is limited to 35 MB and the combined attached audio/image
-  request must be below 80 MB;
-- uploaded file IDs are supplied in the message `attachments` array;
-- this is file-based audio understanding/transcription, not streaming STT;
 - models support user-defined functions/tool calls;
 - structured output can be constrained with `response_format.type=json_schema`;
 - GigaChat also provides a separate embeddings endpoint, but embeddings are not
   required for the first search implementation.
 
-Keep the GigaChat client behind an application interface so another provider or
-dedicated STT service can be substituted without changing business logic.
+Keep both GigaChat command interpretation and Polza speech-to-text behind
+application interfaces so either provider can be substituted without changing
+business logic.
 Always validate model-produced data with Pydantic before changing the database.
 The model may select an action and propose arguments; it must not execute SQL.
 
@@ -187,9 +183,8 @@ after processing whenever the API flow permits it.
 Resolve these through small technical spikes before locking implementation:
 
 - exact GigaChat model available under the project credentials and whether its
-  freemium quota supports audio attachments, functions, and JSON schema;
-- whether one multimodal request should both transcribe and extract the action,
-  or whether transcription and structured interpretation should be two calls;
+  quota supports JSON schema reliably;
+- Polza Whisper Turbo compatibility with the browser's WebM/Opus recordings;
 - browser audio format and any FFmpeg conversion needed on the VPS;
 - whether voice output is required for the first deployed version and, if so,
   which TTS provider or browser API to use;

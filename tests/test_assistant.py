@@ -33,6 +33,26 @@ class ScriptedClient:
         return next(self.commands)
 
 
+class CapturingClient(ScriptedClient):
+    def __init__(self, commands: list[AssistantCommand]) -> None:
+        super().__init__(commands)
+        self.requests = []
+
+    async def interpret(self, **kwargs) -> AssistantCommand:
+        self.requests.append(kwargs)
+        return await super().interpret(**kwargs)
+
+
+class ScriptedTranscriber:
+    def __init__(self, transcripts: list[str]) -> None:
+        self.transcripts = iter(transcripts)
+        self.requests = []
+
+    async def transcribe(self, filename, content, content_type) -> str:
+        self.requests.append((filename, content, content_type))
+        return next(self.transcripts)
+
+
 def test_meeting_clarification_keeps_date_and_updates_time(db):
     session_id = str(uuid4())
     client = ScriptedClient([
@@ -53,13 +73,13 @@ def test_meeting_clarification_keeps_date_and_updates_time(db):
             starts_at=datetime.fromisoformat("2026-10-15T15:30:00+03:00"),
         ),
     ])
-    service = AssistantService(db, Settings(), client)
+    service = AssistantService(db, Settings(), client, lambda: NOW)
 
     first = asyncio.run(
         service.handle_text(session_id, "Добавь встречу с Иваном 20 октября")
     )
     # HTTP requests create a new service object; pending state must survive it.
-    service = AssistantService(db, Settings(), client)
+    service = AssistantService(db, Settings(), client, lambda: NOW)
     second = asyncio.run(service.handle_text(session_id, "В 15:30"))
 
     assert first.needs_clarification is True
@@ -255,3 +275,82 @@ def test_pending_task_treats_clarify_response_as_context_answer(db):
     assert second.needs_clarification is False
     assert second.created_event.title == "Сходить в магазин"
     assert second.created_event.due_date == "2026-10-15"
+
+
+def test_audio_is_transcribed_before_command_interpretation(db):
+    session_id = str(uuid4())
+    transcript = "Добавь задачу сходить в магазин завтра"
+    model = CapturingClient(
+        [
+            AssistantCommand(
+                action=Action.CREATE_TASK,
+                transcript="Перефразированный текст",
+                title="Сходить в магазин",
+                event_type=EventType.TASK,
+                due_date=datetime.fromisoformat("2026-10-16").date(),
+            )
+        ]
+    )
+    transcriber = ScriptedTranscriber([transcript])
+    service = AssistantService(
+        db,
+        Settings(),
+        model,
+        lambda: NOW,
+        transcription_client=transcriber,
+    )
+
+    result = asyncio.run(
+        service.handle_audio(
+            session_id, "recording.webm", b"webm-audio", "audio/webm"
+        )
+    )
+
+    assert transcriber.requests == [
+        ("recording.webm", b"webm-audio", "audio/webm")
+    ]
+    assert model.requests[0]["text"] == transcript
+    assert "attachment_id" not in model.requests[0]
+    assert result.transcript == transcript
+    assert result.created_event.title == "Сходить в магазин"
+
+
+def test_audio_clarification_uses_pending_context(db):
+    session_id = str(uuid4())
+    model = CapturingClient(
+        [
+            AssistantCommand(
+                action=Action.CREATE_TASK,
+                transcript="На сегодня",
+                title=None,
+                event_type=EventType.TASK,
+                missing_fields=["title"],
+                clarification_question="Что нужно сделать?",
+            )
+        ]
+    )
+    transcriber = ScriptedTranscriber(["На сегодня"])
+    service = AssistantService(
+        db,
+        Settings(),
+        model,
+        lambda: NOW,
+        transcription_client=transcriber,
+    )
+    pending = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Нужно сходить в магазин",
+        title="Сходить в магазин",
+        event_type=EventType.TASK,
+        missing_fields=["due_date"],
+        clarification_question="На какую дату поставить задачу?",
+    )
+    service.dialogue.set_pending(session_id, pending)
+
+    result = asyncio.run(
+        service.handle_audio(session_id, "answer.webm", b"audio", "audio/webm")
+    )
+
+    assert model.requests[0]["pending_action"]["title"] == "Сходить в магазин"
+    assert result.needs_clarification is False
+    assert result.created_event.due_date == "2026-10-15"

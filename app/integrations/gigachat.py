@@ -59,12 +59,9 @@ class GigaChatClient:
         text: str,
         now_iso: str,
         pending_action: dict | None = None,
-        attachment_id: str | None = None,
     ) -> AssistantCommand:
         system = self._system_prompt(now_iso, pending_action)
         user_message: dict[str, Any] = {"role": "user", "content": text}
-        if attachment_id:
-            user_message["attachments"] = [attachment_id]
         payload = {
             "model": self.settings.gigachat_model,
             "messages": [
@@ -119,25 +116,6 @@ class GigaChatClient:
                     ),
                 )
             raise GigaChatError("GigaChat вернул ответ в неожиданном формате") from exc
-
-    async def upload_audio(self, filename: str, content: bytes, content_type: str) -> str:
-        data = await self._request(
-            "POST",
-            "/files",
-            data={"purpose": "general"},
-            files={"file": (filename, content, content_type)},
-        )
-        try:
-            return str(data["id"])
-        except KeyError as exc:
-            raise GigaChatError("GigaChat не вернул идентификатор аудиофайла") from exc
-
-    async def delete_file(self, file_id: str) -> None:
-        try:
-            await self._request("POST", f"/files/{file_id}/delete")
-        except GigaChatError:
-            # Cleanup failure must not hide a successfully processed command.
-            return
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         if not self.settings.gigachat_auth_key:

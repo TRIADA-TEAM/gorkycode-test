@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Callable
 from datetime import datetime, time
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -13,7 +14,7 @@ from app.domain.commands import (
     EventResponse,
     EventType,
 )
-from app.integrations.gigachat import GigaChatClient
+from app.integrations.polza import TranscriptionError
 from app.services.commands import (
     DEFAULT_TITLES,
     _has_event_query_intent,
@@ -30,19 +31,33 @@ from app.services.text import normalize_text
 logger = logging.getLogger(__name__)
 
 
+class CommandClient(Protocol):
+    async def interpret(
+        self, *, text: str, now_iso: str, pending_action: dict | None = None
+    ) -> AssistantCommand: ...
+
+
+class SpeechToTextClient(Protocol):
+    async def transcribe(
+        self, filename: str, content: bytes, content_type: str
+    ) -> str: ...
+
+
 class AssistantService:
     def __init__(
         self,
         db: Session,
         settings: Settings,
-        client: GigaChatClient,
+        client: CommandClient,
         now_provider: Callable[[], datetime] | None = None,
+        transcription_client: SpeechToTextClient | None = None,
     ) -> None:
         self.settings = settings
         self.client = client
         self.events = EventService(db, settings.default_timezone)
         self.dialogue = DialogueService(db)
         self._now_provider = now_provider
+        self.transcription_client = transcription_client
 
     async def handle_text(self, session_id: str, text: str) -> AssistantResponse:
         pending = self.dialogue.get_pending(session_id)
@@ -57,19 +72,22 @@ class AssistantService:
     async def handle_audio(
         self, session_id: str, filename: str, content: bytes, content_type: str
     ) -> AssistantResponse:
+        if self.transcription_client is None:
+            raise TranscriptionError("Распознавание речи не настроено")
         pending = self.dialogue.get_pending(session_id)
-        file_id = await self.client.upload_audio(filename, content, content_type)
-        try:
-            command = await self.client.interpret(
-                text="Транскрибируй аудио и выполни содержащуюся в нем команду.",
-                now_iso=self._now_iso(),
-                pending_action=pending,
-                attachment_id=file_id,
-            )
-            command = self._normalize_and_log(command, pending)
-            return self.execute(session_id, command, "user_audio")
-        finally:
-            await self.client.delete_file(file_id)
+        transcript = await self.transcription_client.transcribe(
+            filename, content, content_type
+        )
+        command = await self.client.interpret(
+            text=transcript,
+            now_iso=self._now_iso(),
+            pending_action=pending,
+        )
+        # The user must see the actual STT result even if the command model
+        # paraphrases it in its structured response.
+        command = command.model_copy(update={"transcript": transcript})
+        command = self._normalize_and_log(command, pending)
+        return self.execute(session_id, command, "user_audio")
 
     def execute(
         self, session_id: str, command: AssistantCommand, source: str

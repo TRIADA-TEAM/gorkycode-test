@@ -14,8 +14,31 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Откройте `http://127.0.0.1:8000`. Для обработки команд заполните
-`GIGACHAT_AUTH_KEY` в `.env`.
+Откройте `http://127.0.0.1:8000`. Для обработки текстовых команд заполните
+`GIGACHAT_AUTH_KEY` в `.env`. Для голосового ввода также укажите
+`POLZA_API_KEY`: аудио распознаётся моделью
+`openai/whisper-large-v3-turbo` через Polza, после чего полученный текст
+обрабатывается тем же путём, что и обычная текстовая команда.
+
+Голосовой поток:
+
+```text
+браузер → POST /api/assistant/audio → Polza Whisper → текст → GigaChat → команда
+```
+
+По умолчанию используются:
+
+```dotenv
+POLZA_API_URL=https://polza.ai/api/v1
+POLZA_STT_MODEL=openai/whisper-large-v3-turbo
+POLZA_STT_LANGUAGE=ru
+```
+
+Ключ Polza должен начинаться с `pza_`. Он хранится только в `.env` и никогда
+не передаётся браузеру. Приложение принимает короткие записи WebM/Opus, OGG,
+MP3, MP4/M4A и WAV размером до `MAX_AUDIO_BYTES`. Если конкретный браузерный
+WebM будет отклонён провайдером, потребуется отдельная конвертация через FFmpeg;
+в текущую версию она намеренно не включена.
 
 ## Docker
 
