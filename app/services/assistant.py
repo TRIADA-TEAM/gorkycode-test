@@ -381,14 +381,21 @@ class AssistantService:
                 candidates = [
                     event
                     for event in candidates
-                    if self._event_date(event) == parsed.date_value
+                    if self._event_matches_datetime(event, parsed.date_value, parsed.time_value)
                 ]
         return candidates
 
     @staticmethod
-    def _event_date(event):
+    def _event_matches_datetime(event, expected_date, expected_time=None):
         value = event.starts_at or event.due_date or event.due_at
-        return datetime.fromisoformat(value[:10]).date() if value else None
+        if not value:
+            return False
+        event_datetime = datetime.fromisoformat(value)
+        if event_datetime.date() != expected_date:
+            return False
+        return expected_time is None or event_datetime.time().replace(
+            second=0, microsecond=0
+        ) == expected_time
 
     def _apply_event_update(self, event, command: AssistantCommand):
         parsed = parse_datetime_parts(command.transcript, self._now())

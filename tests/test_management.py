@@ -220,7 +220,7 @@ def test_explicit_date_filters_model_candidate_ids_before_delete(db):
         session_id, meeting_command("Встреча с командой", 26, 15), "user_text"
     ).created_event
     second = assistant.execute(
-        session_id, meeting_command("Встреча с командой", 27, 15), "user_text"
+        session_id, meeting_command("Встреча с командой", 26, 16), "user_text"
     ).created_event
 
     result = assistant.execute(
@@ -235,9 +235,9 @@ def test_explicit_date_filters_model_candidate_ids_before_delete(db):
     )
 
     assert result.needs_clarification is False
-    assert result.created_event.id == first.id
-    assert assistant.events.get_owned(session_id, first.id).status == EventStatus.CANCELLED.value
-    assert assistant.events.get_owned(session_id, second.id).status == EventStatus.PENDING.value
+    assert result.created_event.id == second.id
+    assert assistant.events.get_owned(session_id, first.id).status == EventStatus.PENDING.value
+    assert assistant.events.get_owned(session_id, second.id).status == EventStatus.CANCELLED.value
 
 
 def test_cancel_phrase_clears_pending_without_calling_model(db):
