@@ -10,7 +10,6 @@ manual intervention.
 
 The source assignment is
 `Тестовое_задание_голосовой_ассистент_для_задач_и_встреч.pdf`.
-`voice_assistant_events_1000.csv` is example/seed data, not a formal test set.
 Follow `IMPLEMENTATION_PLAN.md` for the agreed architecture, API, data model,
 delivery phases, and MVP completion criteria.
 
@@ -38,6 +37,10 @@ Out of scope for the first version:
 
 - Backend: Python and FastAPI.
 - Persistence: SQLite on the VPS filesystem, accessed through SQLAlchemy.
+- Runtime schema management: Alembic only. `create_all()` is reserved for
+  isolated tests. SQLite connections enable foreign keys and a 5-second busy
+  timeout. Use `python -m scripts.migrate`; it validates and stamps a compatible
+  legacy `create_all()` database before applying later Alembic revisions.
 - Deployment: a simple VPS with persistent disk and HTTPS.
 - LLM/NLU: GigaChat API.
 - Voice input: record a short audio file in the browser, upload it to the
@@ -46,7 +49,7 @@ Out of scope for the first version:
 - UI: a minimal web page with a record button, text input, dialogue history,
   and visible event results.
 - Time zone: `Europe/Moscow` until the product rules are revisited.
-- Seed import: load the supplied CSV idempotently on initial setup.
+- No seed dataset or seed import is used. Tests create their own isolated data.
 
 Do not depend on SaluteSpeech for the MVP. As of 2026-10-10 its API still has
 documentation and supports existing customers, but since 2026-07-15 connection
@@ -85,8 +88,7 @@ people, and introduce unnecessary personal-data concerns.
 
 On first visit, generate a random UUID in the browser and store it in a cookie
 or `localStorage`. Send it as an opaque session ID with API requests. Use that ID
-to isolate reviewer-created events and dialogue state. Seed CSV events may be
-read-only shared demo data visible to every anonymous session.
+to isolate reviewer-created events and dialogue state.
 
 Persist short dialogue state in SQLite. A session should contain at least:
 
@@ -108,14 +110,19 @@ Do not send an unbounded conversation transcript to the model. Store messages
 for UI/history if useful, but pass only the current request, compact session
 state, and the few most recent turns needed for disambiguation.
 
+`pending_action` expires after 30 minutes by default. Configure this through
+`DIALOGUE_TTL_MINUTES`. Reading an expired pending action clears it and starts a
+new command. Creating an event and clearing its pending action must happen in
+one database transaction so a partial failure cannot create duplicates.
+
 ## Data model direction
 
 Use one `events` table for tasks, reminders, and meetings. It should include at
 least:
 
 - `id`;
-- `owner_session_id` (nullable for shared seed data);
-- `source` (`seed`, `user_text`, or `user_audio`);
+- `owner_session_id`;
+- `source` (`user_text` or `user_audio`);
 - `type` (`task`, `reminder`, or `meeting`);
 - `title` and optional `description`;
 - `starts_at`, `ends_at`, and/or `due_at`;
@@ -140,19 +147,15 @@ Current provisional time rules:
 
 ## Search plan
 
-Start with deterministic search, not RAG:
+Use deterministic search, not RAG:
 
 1. Assign normalized tags when importing or creating an event.
 2. Filter by event type, date range, and session ownership.
-3. Search tags and normalized event text using SQLite FTS5 where available.
+3. Search tags and normalized event text in the current anonymous session.
 4. Return a small ranked result set.
 
-If this is insufficient, add semantic retrieval using the GigaChat embeddings
-endpoint. For only about 1,000 seed records, embeddings can be stored as JSON or
-BLOB values in SQLite and cosine similarity can be calculated in Python; a
-separate vector database is unnecessary. Treat this as semantic search, not as
-a full RAG system unless retrieved events are actually supplied to a model for
-answer generation.
+SQLite FTS5, embeddings, a vector database, and RAG are not required for this
+test project. Reconsider them only if deterministic search proves insufficient.
 
 ## Secrets and repository safety
 
@@ -168,7 +171,9 @@ after processing whenever the API flow permits it.
 ## Quality and delivery requirements
 
 - Provide a health endpoint suitable for VPS monitoring.
-- Add an idempotent database initialization and seed-import command.
+- Use Alembic as the only runtime schema initialization mechanism. Application
+  startup must not call `Base.metadata.create_all()`; tests may use it for an
+  isolated in-memory database.
 - Include Docker-based setup and production launch instructions.
 - Provide graceful messages for microphone denial, malformed audio, provider
   timeouts, invalid model output, and database errors.
@@ -177,6 +182,17 @@ after processing whenever the API flow permits it.
   as separate modules.
 - README must explain architectural decisions, limitations, environment setup,
   service URL, and several example phrases reviewers can try.
+
+## Deferred features
+
+Do not implement these until the core acceptance scenarios are stable:
+
+- editing, completing, and deleting events;
+- explicit cancellation of a pending dialogue (implement it together with
+  event deletion/cancellation commands);
+- FTS5, embeddings, and RAG;
+- additional calendar integrations;
+- broad cross-browser audio conversion.
 
 ## Open decisions
 

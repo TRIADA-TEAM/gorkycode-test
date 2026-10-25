@@ -1,5 +1,6 @@
 import json
-from datetime import datetime, timedelta
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -18,7 +19,14 @@ class EventService:
         self.db = db
         self.timezone = timezone
 
-    def create_task(self, session_id: str, command: AssistantCommand, source: str) -> Event:
+    def create_task(
+        self,
+        session_id: str,
+        command: AssistantCommand,
+        source: str,
+        *,
+        commit: bool = True,
+    ) -> Event:
         event_type = command.event_type or EventType.TASK
         due_date = command.due_date or (command.due_at.date() if command.due_at else None)
         event = self._make_event(
@@ -30,9 +38,16 @@ class EventService:
             due_date=due_date.isoformat() if due_date else None,
             raw_text=command.transcript,
         )
-        return self._save(event)
+        return self._save(event, commit=commit)
 
-    def create_meeting(self, session_id: str, command: AssistantCommand, source: str) -> Event:
+    def create_meeting(
+        self,
+        session_id: str,
+        command: AssistantCommand,
+        source: str,
+        *,
+        commit: bool = True,
+    ) -> Event:
         starts_at = command.starts_at
         ends_at = command.ends_at or (starts_at + timedelta(hours=1) if starts_at else None)
         event = self._make_event(
@@ -44,7 +59,7 @@ class EventService:
             ends_at=iso(ends_at),
             raw_text=command.transcript,
         )
-        return self._save(event)
+        return self._save(event, commit=commit)
 
     def list_events(
         self,
@@ -57,8 +72,6 @@ class EventService:
         moment = Event.starts_at
         fallback_moment = Event.due_at
         date_only = Event.due_date
-        # Seed/demo rows are not personal data and must not leak into an
-        # anonymous user's lists or search results.
         conditions = [Event.owner_session_id == session_id]
         if event_type:
             conditions.append(Event.type == event_type.value)
@@ -133,36 +146,75 @@ class EventService:
             search_text=normalize_text(" ".join([title, *tags])),
         )
 
-    def _save(self, event: Event) -> Event:
+    def _save(self, event: Event, *, commit: bool = True) -> Event:
         self.db.add(event)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         self.db.refresh(event)
         return event
 
 
 class DialogueService:
-    def __init__(self, db: Session) -> None:
+    def __init__(
+        self,
+        db: Session,
+        ttl_minutes: int = 30,
+        now_provider: Callable[[], datetime] | None = None,
+    ) -> None:
         self.db = db
+        self.ttl = timedelta(minutes=max(0, ttl_minutes))
+        self.now_provider = now_provider or (lambda: datetime.now(timezone.utc))
 
-    def get_or_create(self, session_id: str) -> DialogueSession:
+    def get_or_create(
+        self, session_id: str, *, commit: bool = True
+    ) -> DialogueSession:
         item = self.db.get(DialogueSession, session_id)
         if item is None:
             item = DialogueSession(session_id=session_id)
             self.db.add(item)
-            self.db.commit()
+            if commit:
+                self.db.commit()
+            else:
+                self.db.flush()
             self.db.refresh(item)
         return item
 
     def get_pending(self, session_id: str) -> dict | None:
         item = self.get_or_create(session_id)
+        if item.pending_action and self._is_expired(item.updated_at):
+            item.pending_action = None
+            self.db.commit()
+            return None
         return json.loads(item.pending_action) if item.pending_action else None
 
-    def set_pending(self, session_id: str, command: AssistantCommand) -> None:
-        item = self.get_or_create(session_id)
+    def set_pending(
+        self, session_id: str, command: AssistantCommand, *, commit: bool = True
+    ) -> None:
+        item = self.get_or_create(session_id, commit=commit)
         item.pending_action = command.model_dump_json()
-        self.db.commit()
+        item.updated_at = self.now_provider().astimezone(timezone.utc)
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
 
-    def clear_pending(self, session_id: str) -> None:
-        item = self.get_or_create(session_id)
+    def clear_pending(self, session_id: str, *, commit: bool = True) -> None:
+        item = self.get_or_create(session_id, commit=commit)
         item.pending_action = None
-        self.db.commit()
+        item.updated_at = self.now_provider().astimezone(timezone.utc)
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
+
+    def _is_expired(self, updated_at: datetime) -> bool:
+        if self.ttl.total_seconds() <= 0:
+            return False
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
+        now = self.now_provider()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        return now.astimezone(timezone.utc) - updated_at.astimezone(timezone.utc) > self.ttl

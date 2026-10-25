@@ -10,7 +10,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-alembic upgrade head
+python -m scripts.migrate
 uvicorn app.main:app --reload
 ```
 
@@ -32,6 +32,7 @@ uvicorn app.main:app --reload
 POLZA_API_URL=https://polza.ai/api/v1
 POLZA_STT_MODEL=openai/whisper-large-v3-turbo
 POLZA_STT_LANGUAGE=ru
+DIALOGUE_TTL_MINUTES=30
 ```
 
 Ключ Polza должен начинаться с `pza_`. Он хранится только в `.env` и никогда
@@ -48,18 +49,12 @@ docker compose up -d --build
 ```
 
 SQLite хранится в persistent Docker volume и не пропадает при перезапуске
-контейнера. При старте контейнер автоматически применяет миграции. Seed-данные
-не импортируются по умолчанию и не отображаются пользователям. `IMPORT_SEED`
-оставлен только для тестовых/демонстрационных баз; в production его включать не
-нужно. Перед приложением следует настроить
+контейнера. При старте контейнер автоматически применяет миграции Alembic.
+Команда `python -m scripts.migrate` также безопасно принимает старую базу,
+ранее созданную приложением через `create_all()`, если её схема совместима.
+Seed-данные и внешний CSV не используются. Перед приложением следует настроить
 Caddy или Nginx с HTTPS: браузер предоставляет микрофон только в безопасном
 контексте.
-
-Если seed-данные уже были импортированы в существующую базу, удалите их один раз:
-
-```bash
-python -m scripts.clear_seed
-```
 
 ## Проверка
 

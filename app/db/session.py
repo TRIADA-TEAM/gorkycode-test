@@ -1,11 +1,10 @@
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
-from app.db.base import Base
 
 
 def _ensure_sqlite_directory(url: str) -> None:
@@ -24,8 +23,13 @@ engine = create_engine(settings.database_url, connect_args=connect_args)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
-def init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+if settings.database_url.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragmas(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
 
 
 async def get_db() -> AsyncGenerator[Session, None]:

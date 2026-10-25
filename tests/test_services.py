@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from app.domain.commands import Action, AssistantCommand, EventType
@@ -49,12 +49,10 @@ def test_date_only_task_is_listed_for_its_date(db):
     assert [event.title for event in result] == ["Подготовить договор"]
 
 
-def test_sessions_are_isolated_and_seed_is_not_user_visible(db):
+def test_sessions_are_isolated(db):
     first, second = str(uuid4()), str(uuid4())
     service = EventService(db)
     service.create_task(first, command(title="Личная задача"), "user_text")
-    seed = service._make_event(None, "seed", "task", "Общая задача", "Общая задача")
-    service._save(seed)
 
     assert service.list_events(second) == []
     assert {item.title for item in service.list_events(first)} == {"Личная задача"}
@@ -162,3 +160,29 @@ def test_pending_action_round_trip(db):
     assert service.get_pending(session_id)["title"] == "Встреча с Иваном"
     service.clear_pending(session_id)
     assert service.get_pending(session_id) is None
+
+
+def test_pending_action_expires_after_ttl(db):
+    session_id = str(uuid4())
+    started_at = datetime.fromisoformat("2026-10-15T12:00:00+00:00")
+    pending = command(
+        action=Action.CREATE_MEETING,
+        title="Встреча с Иваном",
+        starts_at=None,
+        due_at=None,
+        missing_fields=["start_time"],
+        clarification_question="На какое время?",
+    )
+    DialogueService(db, ttl_minutes=30, now_provider=lambda: started_at).set_pending(
+        session_id, pending
+    )
+
+    active = DialogueService(
+        db, ttl_minutes=30, now_provider=lambda: started_at + timedelta(minutes=29)
+    )
+    expired = DialogueService(
+        db, ttl_minutes=30, now_provider=lambda: started_at + timedelta(minutes=31)
+    )
+
+    assert active.get_pending(session_id) is not None
+    assert expired.get_pending(session_id) is None

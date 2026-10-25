@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     polza_stt_max_retries: int = 3
 
     max_audio_bytes: int = 10 * 1024 * 1024
-    import_seed: bool = False
+    dialogue_ttl_minutes: int = 30
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

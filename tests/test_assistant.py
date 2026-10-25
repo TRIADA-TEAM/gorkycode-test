@@ -3,8 +3,10 @@ from datetime import datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 
 from app.config import Settings
+from app.db.base import Event
 from app.domain.commands import Action, AssistantCommand, EventType
 from app.services.assistant import AssistantService, list_reply
 
@@ -117,6 +119,35 @@ def test_pending_action_survives_database_error(db, monkeypatch):
     with pytest.raises(RuntimeError, match="database error"):
         service.execute(session_id, completed, "user_text")
 
+    assert service.dialogue.get_pending(session_id) is not None
+
+
+def test_event_and_pending_clear_are_rolled_back_together(db, monkeypatch):
+    session_id = str(uuid4())
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+    pending = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Добавь задачу подготовить отчёт",
+        title="Подготовить отчёт",
+        event_type=EventType.TASK,
+        due_date=datetime.fromisoformat("2026-10-20").date(),
+        missing_fields=["due_date"],
+        clarification_question="На какую дату поставить задачу?",
+    )
+    service.dialogue.set_pending(session_id, pending)
+    completed = pending.model_copy(
+        update={"missing_fields": [], "clarification_question": None}
+    )
+
+    def fail_clear(*_args, **_kwargs):
+        raise RuntimeError("clear failed")
+
+    monkeypatch.setattr(service.dialogue, "clear_pending", fail_clear)
+
+    with pytest.raises(RuntimeError, match="clear failed"):
+        service.execute(session_id, completed, "user_text")
+
+    assert db.scalars(select(Event).where(Event.owner_session_id == session_id)).all() == []
     assert service.dialogue.get_pending(session_id) is not None
 
 

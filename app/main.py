@@ -1,5 +1,4 @@
 import logging
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -8,7 +7,6 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.config import get_settings
-from app.db.session import init_db
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -19,13 +17,7 @@ logging.basicConfig(
 )
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    init_db()
-    yield
-
-
-app = FastAPI(title="Голосовой ассистент", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Голосовой ассистент", version="0.1.0")
 app.include_router(router)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

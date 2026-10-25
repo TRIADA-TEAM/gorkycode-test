@@ -54,9 +54,14 @@ class AssistantService:
     ) -> None:
         self.settings = settings
         self.client = client
-        self.events = EventService(db, settings.default_timezone)
-        self.dialogue = DialogueService(db)
+        self.db = db
         self._now_provider = now_provider
+        self.events = EventService(db, settings.default_timezone)
+        self.dialogue = DialogueService(
+            db,
+            settings.dialogue_ttl_minutes,
+            now_provider=lambda: self._now(),
+        )
         self.transcription_client = transcription_client
 
     async def handle_text(self, session_id: str, text: str) -> AssistantResponse:
@@ -104,8 +109,9 @@ class AssistantService:
             )
 
         if command.action == Action.CREATE_TASK:
-            event = self.events.create_task(session_id, command, source)
-            self.dialogue.clear_pending(session_id)
+            event = self._create_event_atomically(
+                session_id, command, source, meeting=False
+            )
             if event.type == EventType.REMINDER.value:
                 reply = f"Напоминание «{event.title}» добавлено."
             elif event.due_date or event.due_at:
@@ -119,8 +125,9 @@ class AssistantService:
                 created_event=EventResponse.model_validate(event),
             )
         if command.action == Action.CREATE_MEETING:
-            event = self.events.create_meeting(session_id, command, source)
-            self.dialogue.clear_pending(session_id)
+            event = self._create_event_atomically(
+                session_id, command, source, meeting=True
+            )
             return AssistantResponse(
                 reply=f"Встреча «{event.title}» добавлена на {event.starts_at}.",
                 action=command.action.value,
@@ -156,6 +163,31 @@ class AssistantService:
                 events=[EventResponse.model_validate(event) for event in events],
             )
         raise ValueError(f"Unsupported action: {command.action}")
+
+    def _create_event_atomically(
+        self,
+        session_id: str,
+        command: AssistantCommand,
+        source: str,
+        *,
+        meeting: bool,
+    ):
+        try:
+            if meeting:
+                event = self.events.create_meeting(
+                    session_id, command, source, commit=False
+                )
+            else:
+                event = self.events.create_task(
+                    session_id, command, source, commit=False
+                )
+            self.dialogue.clear_pending(session_id, commit=False)
+            self.db.commit()
+            self.db.refresh(event)
+            return event
+        except Exception:
+            self.db.rollback()
+            raise
 
     def _now_iso(self) -> str:
         return self._now().isoformat()
