@@ -76,6 +76,10 @@ Initial application actions/tools:
 - `create_meeting`
 - `list_events`
 - `search_events`
+- `update_event`
+- `delete_event`
+- `complete_event`
+- `cancel_action`
 
 Prefer strict JSON schema for intent and argument extraction. User-visible
 answers may be generated only after the application has validated and executed
@@ -115,6 +119,13 @@ state, and the few most recent turns needed for disambiguation.
 new command. Creating an event and clearing its pending action must happen in
 one database transaction so a partial failure cannot create duplicates.
 
+Creation, a list/search result containing exactly one event, and a successful
+update or completion set `last_referenced_event_id`. This lets a following
+command use references such as `перенеси её` or `удали его`. If a description
+matches several events, return the candidates and persist their IDs; the user
+can select one by its displayed number. Never resolve an event ID outside the
+current anonymous session.
+
 ## Data model direction
 
 Use one `events` table for tasks, reminders, and meetings. It should include at
@@ -142,8 +153,31 @@ Current provisional time rules:
 - a meeting requires a start time;
 - default meeting duration is 60 minutes;
 - ambiguous or contradictory input triggers a clarification instead of a write;
+- overlapping pending meetings trigger a warning and require explicit
+  confirmation; meetings whose boundaries merely touch are not overlapping;
+- rejecting a conflict confirmation or saying `не надо` clears the pending
+  operation without calling the language model;
 - relative-date behavior will be refined later and must be covered by tests with
   a fixed application clock.
+
+## Event management rules
+
+- Tasks, reminders, and meetings can be renamed or moved through the same text
+  and voice assistant endpoints used for creation.
+- Updating only the date preserves an existing time; updating only the time
+  preserves an existing date. Meeting duration is preserved when moved.
+- A task without a deadline can be renamed without inventing a date. Supplying
+  only a time for such a task requires clarification of the date.
+- Tasks and reminders can be marked completed. Meetings cannot be completed;
+  they can be moved or deleted.
+- Deletion is soft deletion: set `status=cancelled`, do not remove the database
+  row. Cancelled events are hidden from normal lists and search.
+- Completed events are hidden from upcoming lists but remain searchable so the
+  user can still address or inspect them.
+- Past dates and times are rejected before a write and the pending update is
+  preserved so the user can provide a corrected value.
+- If an update, delete, or completion command does not identify a target, ask
+  which event is meant. Never silently select the only stored event.
 
 ## Search plan
 
@@ -187,11 +221,10 @@ after processing whenever the API flow permits it.
 
 Do not implement these until the core acceptance scenarios are stable:
 
-- editing, completing, and deleting events;
-- explicit cancellation of a pending dialogue (implement it together with
-  event deletion/cancellation commands);
 - FTS5, embeddings, and RAG;
 - additional calendar integrations;
+- recurring events and production notifications;
+- restoring cancelled events and a dedicated completed/cancelled history UI;
 - broad cross-browser audio conversion.
 
 ## Open decisions
@@ -205,4 +238,6 @@ Resolve these through small technical spikes before locking implementation:
 - whether voice output is required for the first deployed version and, if so,
   which TTS provider or browser API to use;
 - final tagging vocabulary and ranking rules;
-- final rules for relative dates, past times, and conflicting meetings.
+- final rules for relative dates beyond the currently tested phrases;
+- whether meeting conflict detection should eventually include configurable
+  buffer time or only strict interval overlap.

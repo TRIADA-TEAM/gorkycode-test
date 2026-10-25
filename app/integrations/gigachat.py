@@ -20,7 +20,11 @@ COMMAND_SCHEMA: dict[str, Any] = {
     "properties": {
         "action": {
             "type": "string",
-            "enum": ["create_task", "create_meeting", "list_events", "search_events", "clarify"],
+            "enum": [
+                "create_task", "create_meeting", "list_events", "search_events",
+                "update_event", "delete_event", "complete_event", "cancel_action",
+                "clarify",
+            ],
         },
         "transcript": {"type": "string"},
         "title": {"type": ["string", "null"]},
@@ -32,13 +36,19 @@ COMMAND_SCHEMA: dict[str, Any] = {
         "date_from": {"type": ["string", "null"], "format": "date-time"},
         "date_to": {"type": ["string", "null"], "format": "date-time"},
         "query": {"type": ["string", "null"]},
+        "target_event_id": {"type": ["integer", "null"]},
+        "target_query": {"type": ["string", "null"]},
+        "new_title": {"type": ["string", "null"]},
+        "candidate_event_ids": {"type": "array", "items": {"type": "integer"}},
+        "conflict_confirmed": {"type": "boolean"},
         "missing_fields": {"type": "array", "items": {"type": "string"}},
         "clarification_question": {"type": ["string", "null"]},
     },
     "required": [
         "action", "transcript", "title", "event_type", "starts_at", "ends_at",
         "due_at", "date_from", "date_to", "query", "missing_fields",
-        "clarification_question", "due_date",
+        "clarification_question", "due_date", "target_event_id", "target_query",
+        "new_title", "candidate_event_ids", "conflict_confirmed",
     ],
 }
 
@@ -191,7 +201,8 @@ class GigaChatClient:
 «Задача», «Напоминание» или «Встреча».
 Незавершенная команда текущего диалога: {pending}.
 
-Разрешенные действия: create_task, create_meeting, list_events, search_events, clarify.
+Разрешенные действия: create_task, create_meeting, list_events, search_events,
+update_event, delete_event, complete_event, cancel_action, clarify.
 Если сообщение не относится к задачам, напоминаниям, встречам, списку или поиску
 событий, верни action=clarify и коротко сообщи, с чем умеет работать ассистент.
 Если текущая фраза отвечает на уточнение, объедини ее с незавершенной командой.
@@ -204,6 +215,13 @@ class GigaChatClient:
 missing_fields и сформулируй один короткий clarification_question. В таком
 случае сохрани исходное целевое action, а не меняй его на clarify.
 Для запросов списка укажи date_from/date_to. Для поиска укажи query.
+Для изменения, удаления или завершения укажи target_query — краткое описание
+целевого события. Для переименования заполни new_title. Не помещай новое
+название в title. Фразы «перенеси», «измени», «переименуй» означают
+update_event; «удали», «отмени встречу» — delete_event; «выполнено», «заверши»,
+«отметь выполненной» — complete_event. Короткая отмена незавершенного действия
+означает cancel_action. Местоимения «ее», «его», «это» оставляй в target_query:
+backend разрешит ссылку через last_referenced_event_id.
 Все даты верни в ISO-8601 с часовым поясом. transcript должен содержать точный
 распознанный текст пользователя; для аудио сначала транскрибируй запись.
 Верни только объект, соответствующий переданной JSON Schema.

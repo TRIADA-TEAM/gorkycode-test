@@ -9,6 +9,10 @@ class Action(StrEnum):
     CREATE_MEETING = "create_meeting"
     LIST_EVENTS = "list_events"
     SEARCH_EVENTS = "search_events"
+    UPDATE_EVENT = "update_event"
+    DELETE_EVENT = "delete_event"
+    COMPLETE_EVENT = "complete_event"
+    CANCEL_ACTION = "cancel_action"
     CLARIFY = "clarify"
 
 
@@ -16,6 +20,12 @@ class EventType(StrEnum):
     TASK = "task"
     REMINDER = "reminder"
     MEETING = "meeting"
+
+
+class EventStatus(StrEnum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class AssistantCommand(BaseModel):
@@ -32,6 +42,11 @@ class AssistantCommand(BaseModel):
     date_from: datetime | None = None
     date_to: datetime | None = None
     query: str | None = Field(default=None, max_length=500)
+    target_event_id: int | None = None
+    target_query: str | None = Field(default=None, max_length=500)
+    new_title: str | None = Field(default=None, max_length=500)
+    candidate_event_ids: list[int] = Field(default_factory=list)
+    conflict_confirmed: bool = False
     missing_fields: list[str] = Field(default_factory=list)
     clarification_question: str | None = Field(default=None, max_length=500)
 

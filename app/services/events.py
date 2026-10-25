@@ -1,12 +1,12 @@
 import json
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.base import DialogueSession, Event
-from app.domain.commands import AssistantCommand, EventType
+from app.domain.commands import AssistantCommand, EventStatus, EventType
 from app.services.text import extract_tags, normalize_text, word_stem
 
 
@@ -68,11 +68,14 @@ class EventService:
         date_to: datetime | None = None,
         event_type: EventType | None = None,
         limit: int = 50,
+        statuses: set[EventStatus] | None = None,
     ) -> list[Event]:
         moment = Event.starts_at
         fallback_moment = Event.due_at
         date_only = Event.due_date
         conditions = [Event.owner_session_id == session_id]
+        allowed_statuses = statuses or {EventStatus.PENDING}
+        conditions.append(Event.status.in_([status.value for status in allowed_statuses]))
         if event_type:
             conditions.append(Event.type == event_type.value)
         event_date = func.substr(func.coalesce(moment, fallback_moment, date_only), 1, 10)
@@ -99,7 +102,14 @@ class EventService:
     ) -> list[Event]:
         normalized = normalize_text(query)
         terms = [term for term in normalized.split() if len(term) >= 2]
-        base = self.list_events(session_id, date_from, date_to, event_type, limit=1000)
+        base = self.list_events(
+            session_id,
+            date_from,
+            date_to,
+            event_type,
+            limit=1000,
+            statuses={EventStatus.PENDING, EventStatus.COMPLETED},
+        )
 
         def score(event: Event) -> tuple[int, int]:
             text = event.search_text
@@ -114,6 +124,70 @@ class EventService:
         ranked = [event for event in base if score(event)[0] > 0]
         ranked.sort(key=score, reverse=True)
         return ranked[:limit]
+
+    def get_owned(self, session_id: str, event_id: int) -> Event | None:
+        event = self.db.get(Event, event_id)
+        if event is None or event.owner_session_id != session_id:
+            return None
+        return event
+
+    def find_meeting_conflicts(
+        self,
+        session_id: str,
+        starts_at: datetime,
+        ends_at: datetime,
+        *,
+        exclude_event_id: int | None = None,
+    ) -> list[Event]:
+        conditions = [
+            Event.owner_session_id == session_id,
+            Event.type == EventType.MEETING.value,
+            Event.status == EventStatus.PENDING.value,
+            Event.starts_at < iso(ends_at),
+            Event.ends_at > iso(starts_at),
+        ]
+        if exclude_event_id is not None:
+            conditions.append(Event.id != exclude_event_id)
+        return list(self.db.scalars(select(Event).where(and_(*conditions))))
+
+    def update_event(
+        self,
+        event: Event,
+        *,
+        title: str | None = None,
+        starts_at: datetime | None = None,
+        ends_at: datetime | None = None,
+        due_at: datetime | None = None,
+        due_date: date | None = None,
+        raw_text: str | None = None,
+        commit: bool = True,
+    ) -> Event:
+        if title is not None:
+            event.title = title
+            tags = extract_tags(title)
+            event.tags = json.dumps(tags, ensure_ascii=False)
+            event.search_text = normalize_text(" ".join([title, *tags]))
+        if event.type == EventType.MEETING.value:
+            if starts_at is not None:
+                event.starts_at = iso(starts_at)
+            if ends_at is not None:
+                event.ends_at = iso(ends_at)
+        else:
+            if due_date is not None:
+                event.due_date = due_date.isoformat()
+            if due_at is not None:
+                event.due_at = iso(due_at)
+            elif due_date is not None:
+                event.due_at = None
+        if raw_text is not None:
+            event.raw_user_text = raw_text
+        return self._persist(event, commit=commit)
+
+    def set_status(
+        self, event: Event, status: EventStatus, *, commit: bool = True
+    ) -> Event:
+        event.status = status.value
+        return self._persist(event, commit=commit)
 
     def _make_event(
         self,
@@ -148,6 +222,9 @@ class EventService:
 
     def _save(self, event: Event, *, commit: bool = True) -> Event:
         self.db.add(event)
+        return self._persist(event, commit=commit)
+
+    def _persist(self, event: Event, *, commit: bool = True) -> Event:
         if commit:
             self.db.commit()
         else:
@@ -203,6 +280,20 @@ class DialogueService:
     def clear_pending(self, session_id: str, *, commit: bool = True) -> None:
         item = self.get_or_create(session_id, commit=commit)
         item.pending_action = None
+        item.updated_at = self.now_provider().astimezone(timezone.utc)
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
+
+    def get_last_referenced_event_id(self, session_id: str) -> int | None:
+        return self.get_or_create(session_id).last_referenced_event_id
+
+    def set_last_referenced_event_id(
+        self, session_id: str, event_id: int | None, *, commit: bool = True
+    ) -> None:
+        item = self.get_or_create(session_id, commit=commit)
+        item.last_referenced_event_id = event_id
         item.updated_at = self.now_provider().astimezone(timezone.utc)
         if commit:
             self.db.commit()
