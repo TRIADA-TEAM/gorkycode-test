@@ -369,7 +369,25 @@ class AssistantService:
             event = self.events.get_owned(session_id, event_id) if event_id else None
             return [event] if event and event.status != EventStatus.CANCELLED.value else []
         query = command.target_query or command.query or command.title or ""
-        return self.events.search_events(session_id, query, event_type=command.event_type, limit=5)
+        candidates = self.events.search_events(
+            session_id, query, event_type=command.event_type, limit=5
+        )
+        # A date in a delete/complete request identifies the target event; do not
+        # force the user to choose a number between same-named events on other dates.
+        if command.action in {Action.DELETE_EVENT, Action.COMPLETE_EVENT}:
+            parsed = parse_datetime_parts(command.transcript, self._now())
+            if parsed.has_explicit_date and parsed.date_value:
+                candidates = [
+                    event
+                    for event in candidates
+                    if self._event_date(event) == parsed.date_value
+                ]
+        return candidates
+
+    @staticmethod
+    def _event_date(event):
+        value = event.starts_at or event.due_date or event.due_at
+        return datetime.fromisoformat(value[:10]).date() if value else None
 
     def _apply_event_update(self, event, command: AssistantCommand):
         parsed = parse_datetime_parts(command.transcript, self._now())
