@@ -3,36 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Голосовой ассистент</title>
+  <meta name="theme-color" content="#f5f6fb">
+  <title>Тихий план — ваш личный планировщик</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <main class="shell">
-    <header>
-      <p class="eyebrow">Задачи и встречи</p>
-      <h1>Чем вам помочь?</h1>
-      <p class="subtitle">Напишите или продиктуйте задачу естественным языком.</p>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Тихий план">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span><strong>Тихий план</strong><small>личный планировщик</small></span>
+      </a>
+      <div class="topbar-actions"><span id="today-label" class="today-label">Сегодня</span><span class="online-dot" aria-hidden="true"></span><span class="online-text">Синхронизировано</span></div>
     </header>
-
-    <section id="chat" class="chat" aria-live="polite">
-      <article class="message assistant">
-        <p>Например: «Добавь встречу с командой завтра в 15:00».</p>
-      </article>
-    </section>
-
-    <form id="text-form" class="composer">
-      <label class="sr-only" for="text-input">Сообщение</label>
-      <input id="text-input" name="text" autocomplete="off"
-             placeholder="Что запланировать?" maxlength="5000" required>
-      <button id="record-button" class="round" type="button" title="Записать голос">●</button>
-      <button id="send-button" type="submit">Отправить</button>
-    </form>
-    <div class="footer-row">
-      <span id="status">Готов к работе</span>
-      <label><input id="speak-toggle" type="checkbox"> Озвучивать ответы</label>
+    <div class="workspace">
+      <section class="conversation-panel" aria-labelledby="page-title">
+        <div class="conversation-intro">
+          <p class="eyebrow">Задачи · встречи · напоминания</p>
+          <h1 id="page-title">Освободите голову<br><em>для важного.</em></h1>
+          <p class="subtitle">Напишите или скажите, что нужно запланировать.<br>Я помогу разложить дела по местам.</p>
+          <aside class="today-card" aria-label="Подсказка по использованию"><span class="today-icon" aria-hidden="true">✦</span><div><strong>Начните с простого</strong><p>«Напомни завтра в 10 позвонить Ивану»</p></div></aside>
+        </div>
+        <section id="chat" class="chat" aria-live="polite" aria-label="История диалога">
+          <div class="chat-header"><span class="section-kicker">Текущий диалог</span><span class="chat-context"><span class="context-dot"></span> Сессия сохранится</span></div>
+          <article class="message assistant welcome-message"><span class="message-label">Тихий план</span><p>Я рядом. Расскажите о задаче или встрече — можно обычными словами.</p></article>
+        </section>
+        <div class="suggestions" aria-label="Примеры команд"><span class="suggestions-label">Попробуйте</span><span class="suggestion-chip">Добавь встречу завтра в 15:00</span><span class="suggestion-chip">Что у меня на этой неделе?</span></div>
+        <form id="text-form" class="composer">
+          <label class="sr-only" for="text-input">Сообщение ассистенту</label>
+          <input id="text-input" name="text" autocomplete="off" placeholder="Что запланировать?" maxlength="5000" required>
+          <button id="record-button" class="icon-button" type="button" title="Записать голосовую команду" aria-label="Записать голосовую команду"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V7a3.5 3.5 0 0 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Zm6-3.5a6 6 0 0 1-12 0m6 6v3m-3 0h6"/></svg></button>
+          <button id="send-button" class="send-button" type="submit"><span>Отправить</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-4 14-3-6-7-1Z"/></svg></button>
+        </form>
+        <div class="footer-row"><span id="status">Готов к работе</span><label class="toggle-label"><input id="speak-toggle" type="checkbox"><span class="toggle" aria-hidden="true"></span> Озвучивать ответы</label></div>
+        <p class="security-note security-note-inline"><span aria-hidden="true">◌</span> Голосовой ввод работает в защищённом соединении HTTPS</p>
+      </section>
     </div>
   </main>
+  <script>
+    const todayLabel = document.querySelector("#today-label");
+    if (todayLabel) {
+      const formatted = new Intl.DateTimeFormat("ru-RU", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        timeZone: "Europe/Moscow",
+      }).format(new Date());
+      todayLabel.textContent = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    }
+  </script>
   <script src="/static/app.js" defer></script>
 </body>
 </html>
-

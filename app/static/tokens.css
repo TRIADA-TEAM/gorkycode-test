@@ -1,0 +1,45 @@
+﻿:root {
+  color-scheme: light;
+  --page: #f5f6ff;
+  --page-wash: #e9ebff;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-muted: #f3f5ff;
+  --ink: #202338;
+  --ink-soft: #505a72;
+  --muted: #737d95;
+  --line: #e1e4f0;
+  --line-strong: #c7cde2;
+  --accent: #5656d6;
+  --accent-dark: #3f3da8;
+  --accent-pale: #ececff;
+  --peach: #fff0d9;
+  --danger: #d66359;
+  --radius-lg: 10px;
+  --radius-md: 8px;
+  --shadow: 0 18px 48px rgba(55, 57, 125, .10), 0 2px 8px rgba(55, 57, 125, .04);
+  font-family: "Roboto", ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--page);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  padding: 32px;
+  background:
+    radial-gradient(circle at 8% 5%, rgba(224, 226, 255, .9), transparent 28rem),
+    radial-gradient(circle at 94% 96%, rgba(245, 224, 214, .45), transparent 24rem),
+    var(--page);
+}
+
+button,
+input { font: inherit; }
+
+button {
+  border: 0;
+  cursor: pointer;
+}
