@@ -1,45 +1,4 @@
-:root {
-  color-scheme: light;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-  color: #17201c;
-  background: #eef2ed;
-}
-
-* { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-.shell {
-  width: min(780px, 100%); height: min(850px, calc(100vh - 48px));
-  display: grid; grid-template-rows: auto 1fr auto auto; gap: 18px;
-  padding: 32px; background: #fff; border: 1px solid #d9e0da; border-radius: 28px;
-  box-shadow: 0 24px 70px rgba(34, 54, 43, .12);
-}
-header { padding: 0 4px; }
-.eyebrow { color: #287a55; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; font-size: 12px; margin: 0 0 8px; }
-h1 { margin: 0; font-size: clamp(30px, 5vw, 48px); letter-spacing: -.04em; }
-.subtitle { color: #657068; margin: 8px 0 0; }
-.chat { overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 12px 4px; }
-.message { max-width: 82%; padding: 13px 16px; border-radius: 18px; line-height: 1.45; }
-.message p { margin: 0; white-space: pre-wrap; }
-.message.user { margin-left: auto; color: white; background: #24734f; border-bottom-right-radius: 5px; }
-.message.assistant { background: #f0f4f0; border-bottom-left-radius: 5px; }
-.events { display: grid; gap: 8px; margin-top: 12px; }
-.event { background: white; border: 1px solid #dce4dd; border-radius: 12px; padding: 10px 12px; }
-.event strong, .event small { display: block; }
-.event small { margin-top: 4px; color: #657068; }
-.composer { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 9px; background: #f2f5f2; border-radius: 18px; }
-.composer input { min-width: 0; border: 0; background: transparent; font: inherit; padding: 10px; outline: none; }
-button { border: 0; border-radius: 12px; padding: 11px 16px; font: inherit; font-weight: 700; cursor: pointer; background: #24734f; color: white; }
-button:disabled { opacity: .5; cursor: wait; }
-button.round { width: 44px; padding: 0; background: #dfe8e1; color: #aa2f2f; border-radius: 50%; }
-button.round.recording { color: white; background: #bd3333; animation: pulse 1s infinite alternate; }
-.footer-row { display: flex; justify-content: space-between; color: #657068; font-size: 13px; padding: 0 4px; }
-.error { color: #a52929; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-@keyframes pulse { to { transform: scale(1.06); } }
-@media (max-width: 600px) {
-  body { padding: 0; }
-  .shell { height: 100vh; border: 0; border-radius: 0; padding: 20px; }
-  .composer { grid-template-columns: 1fr auto; }
-  #send-button { grid-column: 1 / -1; }
-}
-
+﻿@import url("/static/tokens.css");
+@import url("/static/layout.css");
+@import url("/static/components.css");
+@import url("/static/responsive.css");
