@@ -195,6 +195,24 @@ def test_text_search_for_case_is_detected_even_when_provider_returns_clarify():
     assert result.query == "материалам"
 
 
+def test_generic_period_uses_original_text_and_keeps_all_event_types():
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript="Какие задачи у меня на следующей неделе?",
+        event_type=EventType.TASK,
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-27T12:00:00+03:00"),
+        source_text="Что у меня на следующей неделе?",
+    )
+
+    assert result.event_type is None
+    assert result.date_from == datetime.fromisoformat("2026-11-02T00:00:00+03:00")
+    assert result.date_to == datetime.fromisoformat("2026-11-08T23:59:59+03:00")
+
+
 def test_generic_planned_events_removes_model_invented_date_range():
     command = AssistantCommand(
         action=Action.LIST_EVENTS,

@@ -135,7 +135,7 @@ def normalize_command(
         text = normalize_text(source_text or command.transcript)
         if "встреч" in text:
             updates["event_type"] = EventType.MEETING
-        elif "задач" in text or "дел" in text:
+        elif "задач" in text or any(word.startswith("дел") for word in text.split()):
             updates["event_type"] = EventType.TASK
         elif "напомин" in text:
             updates["event_type"] = EventType.REMINDER
@@ -146,10 +146,10 @@ def normalize_command(
         updates["due_at"] = None
 
         if now:
-            relative_period = _relative_period(command.transcript, now)
+            relative_period = _relative_period(source_text or command.transcript, now)
             if relative_period["date_from"] is not None:
                 updates.update(relative_period)
-            elif not parse_datetime_parts(command.transcript, now).has_explicit_date:
+            elif not parse_datetime_parts(source_text or command.transcript, now).has_explicit_date:
                 # A generic list/search request means all available events. Do not
                 # trust a date range invented by the provider.
                 updates.update({"date_from": None, "date_to": None})
@@ -205,7 +205,7 @@ def _is_list_request(text: str) -> bool:
 def _has_event_query_intent(text: str) -> bool:
     if _is_list_request(text):
         return True
-    event_words = ("событ", "задач", "дел", "напомин", "встреч", "план")
+    event_words = ("событ", "задач", "дело", "дела", "напомин", "встреч", "план")
     query_words = ("найди", "найти", "поиск", "покажи", "когда", "есть ли", "что у меня")
     return any(word in text for word in event_words) and any(
         word in text for word in query_words

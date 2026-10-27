@@ -47,7 +47,7 @@ async def assistant_text(
     try:
         return await assistant_service(db).handle_text(session_id, body.text)
     except GigaChatError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail=provider_error_message(str(exc))) from exc
     except Exception as exc:
         logger.exception("Unhandled text assistant error")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка обработки запроса") from exc
@@ -73,12 +73,18 @@ async def assistant_audio(
             session_id, audio.filename or "recording.webm", content, content_type
         )
     except GigaChatError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail=provider_error_message(str(exc))) from exc
     except TranscriptionError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Unhandled audio assistant error")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка обработки запроса") from exc
+
+
+def provider_error_message(detail: str) -> str:
+    if "не настроен" in detail or "авторизоваться" in detail:
+        return detail
+    return "Сервис временно недоступен. Попробуйте повторить запрос через несколько секунд."
 
 
 @router.get("/events", response_model=list[EventResponse])
