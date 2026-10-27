@@ -87,12 +87,25 @@
 }
 
 .suggestion-chip {
+  cursor: pointer;
+  font: inherit;
   padding: 8px 12px;
   color: var(--ink-soft);
   background: var(--surface-raised);
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(39, 64, 49, .03);
+}
+
+.suggestion-chip:hover {
+  color: var(--accent);
+  border-color: #a8a8ec;
+  background: #f5f6ff;
+}
+
+.suggestion-chip:focus-visible {
+  outline: 3px solid rgba(86, 86, 214, .24);
+  outline-offset: 2px;
 }
 
 .composer {

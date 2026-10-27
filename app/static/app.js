@@ -5,11 +5,20 @@ const sendButton = document.querySelector("#send-button");
 const recordButton = document.querySelector("#record-button");
 const statusNode = document.querySelector("#status");
 const speakToggle = document.querySelector("#speak-toggle");
+const suggestionChips = document.querySelectorAll(".suggestion-chip");
 
 const sessionId = getSessionId();
 let recorder = null;
 let stream = null;
 let chunks = [];
+
+suggestionChips.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    if (sendButton.disabled) return;
+    input.value = chip.textContent.trim();
+    form.requestSubmit();
+  });
+});
 
 function getSessionId() {
   let value = localStorage.getItem("assistant-session-id");
