@@ -8,10 +8,17 @@ STOP_WORDS = {
 
 SEARCH_WORDS = {
     "найди", "найти", "поищи", "поиск", "айди", "когда", "была", "был", "было",
-    "были", "будет", "будут", "предстоит", "предстоят", "у", "меня",
+    "были", "будет", "будут", "предстоит", "предстоят", "все", "всех",
+    "весь", "у", "меня",
     "задачу", "задача", "задачи", "дело", "дела", "встречу", "встреча", "встречи", "событие",
     "события", "напоминание", "напоминания", "покажи", "покажите", "про", "по", "с",
 }
+
+TEMPORAL_SEARCH_PREFIXES = (
+    "прошл", "прошедш", "предыдущ", "минувш", "состоявш", "состоял",
+    "завершивш",
+    "будущ", "предстоящ", "грядущ", "ближайш", "запланирован",
+)
 
 
 def normalize_text(value: str) -> str:
@@ -28,7 +35,13 @@ def extract_tags(value: str) -> list[str]:
 def extract_search_query(value: str) -> str:
     """Keep the subject of a natural-language search request."""
     words = normalize_text(value).split()
-    terms = [word for word in words if word not in SEARCH_WORDS and len(word) >= 2]
+    terms = [
+        word
+        for word in words
+        if word not in SEARCH_WORDS
+        and not word.startswith(TEMPORAL_SEARCH_PREFIXES)
+        and len(word) >= 2
+    ]
     return " ".join(terms)
 
 

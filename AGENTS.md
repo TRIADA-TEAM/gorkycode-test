@@ -172,6 +172,10 @@ Current provisional time rules:
   the current timestamp forward. `Было запланировано` returns past events;
   `покажи события` remains unbounded. An explicit day or period takes priority
   and returns that complete calendar range;
+- past synonyms include `прошлые`, `прошедшие`, `предыдущие`, `минувшие`,
+  `состоявшиеся`, and `завершившиеся`; future synonyms include `будущие`,
+  `предстоящие`, `ближайшие`, and `грядущие`. Temporal qualifiers are filters,
+  not search subject terms;
 - an explicit new creation command (`добавь`, `создай`, `поставь`, `напомни`,
   `назначь`, `запланируй`) replaces an unfinished creation instead of inheriting
   its date or time. The new event must independently provide all required data;

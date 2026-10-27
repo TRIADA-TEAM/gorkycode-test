@@ -95,7 +95,7 @@ class EventService:
         stmt = (
             select(Event)
             .where(and_(*conditions))
-            .order_by(Event.starts_at, Event.due_at, Event.due_date, Event.id)
+            .order_by(event_moment.asc().nullslast(), Event.id)
             .limit(limit)
         )
         return list(self.db.scalars(stmt))

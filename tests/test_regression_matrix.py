@@ -123,3 +123,59 @@ def test_explicit_day_has_priority_over_planned_future_direction():
 
     assert result.date_from == datetime.fromisoformat("2026-10-28T00:00:00+03:00")
     assert result.date_to == datetime.fromisoformat("2026-10-28T23:59:59+03:00")
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "Покажи все прошедшие встречи",
+        "Выведи прошлые встречи",
+        "Перечисли предыдущие встречи",
+        "Покажи минувшие встречи",
+        "Какие встречи уже состоялись?",
+        "Покажи завершившиеся встречи",
+    ],
+)
+def test_past_list_keyword_matrix(phrase):
+    command = AssistantCommand(action=Action.CREATE_MEETING, transcript=phrase)
+
+    result = normalize_command(command, NOW)
+
+    assert result.action == Action.LIST_EVENTS
+    assert result.event_type == EventType.MEETING
+    assert result.date_from is None
+    assert result.date_to == NOW
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "Покажи будущие встречи",
+        "Выведи предстоящие встречи",
+        "Перечисли ближайшие встречи",
+        "Покажи грядущие встречи",
+    ],
+)
+def test_future_list_keyword_matrix(phrase):
+    command = AssistantCommand(action=Action.CLARIFY, transcript=phrase,
+                               clarification_question="Уточните запрос")
+
+    result = normalize_command(command, NOW)
+
+    assert result.action == Action.LIST_EVENTS
+    assert result.event_type == EventType.MEETING
+    assert result.date_from == NOW
+    assert result.date_to is None
+
+
+def test_temporal_words_are_removed_from_search_subject():
+    command = AssistantCommand(
+        action=Action.SEARCH_EVENTS,
+        transcript="Найди все прошлые встречи с Иваном",
+        query="ошибка модели",
+    )
+
+    result = normalize_command(command, NOW)
+
+    assert result.query == "иваном"
+    assert result.date_to == NOW

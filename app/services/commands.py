@@ -205,7 +205,18 @@ def _is_list_request(text: str) -> bool:
         "есть ли события",
         "мои планы",
     )
-    return any(marker in text for marker in list_markers) or text.startswith("какие ")
+    plural_list = bool(
+        re.search(
+            r"\b(?:покажи|показать|выведи|вывести|перечисли)\b.*"
+            r"\b(?:события|задачи|встречи|напоминания|планы)\b",
+            text,
+        )
+    )
+    return (
+        any(marker in text for marker in list_markers)
+        or text.startswith("какие ")
+        or plural_list
+    )
 
 
 def _has_event_query_intent(text: str) -> bool:
@@ -227,10 +238,16 @@ def _is_search_request(text: str) -> bool:
 
 
 def _temporal_direction(text: str) -> str | None:
-    if re.search(r"\b(?:был|была|было|были|прошел|прошла|прошло|прошли)\b", text):
+    if re.search(
+        r"\b(?:был|была|было|были|прошл\w*|прошедш\w*|предыдущ\w*|"
+        r"минувш\w*|состоявш\w*|состоял\w*|завершивш\w*)\b",
+        text,
+    ):
         return "past"
     if re.search(
-        r"\b(?:будет|будут|предстоит|предстоят|запланирован\w*)\b", text
+        r"\b(?:будет|будут|будущ\w*|предстоит|предстоят|предстоящ\w*|"
+        r"грядущ\w*|ближайш\w*|запланирован\w*)\b",
+        text,
     ):
         return "future"
     return None

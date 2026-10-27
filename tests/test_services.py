@@ -290,3 +290,44 @@ def test_search_requires_person_name_when_it_is_in_query(db):
 
     assert [event.title for event in with_marusya] == ["Кино с Марусей"]
     assert with_ivan == []
+
+
+def test_mixed_event_types_are_sorted_by_one_timeline(db):
+    session_id = str(uuid4())
+    service = EventService(db)
+    service.create_task(
+        session_id,
+        command(
+            title="Далекое напоминание",
+            event_type=EventType.REMINDER,
+            due_at=datetime.fromisoformat("2027-10-26T15:00:00+03:00"),
+        ),
+        "user_text",
+    )
+    service.create_meeting(
+        session_id,
+        command(
+            title="Ближайшая встреча",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-29T15:00:00+03:00"),
+            due_at=None,
+        ),
+        "user_text",
+    )
+    service.create_task(
+        session_id,
+        command(
+            title="Ближайшее напоминание",
+            event_type=EventType.REMINDER,
+            due_at=datetime.fromisoformat("2026-10-29T14:00:00+03:00"),
+        ),
+        "user_text",
+    )
+
+    result = service.list_events(session_id)
+
+    assert [event.title for event in result] == [
+        "Ближайшее напоминание",
+        "Ближайшая встреча",
+        "Далекое напоминание",
+    ]
