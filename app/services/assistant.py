@@ -364,6 +364,16 @@ class AssistantService:
                 if (event := self.events.get_owned(session_id, event_id))
                 and event.status != EventStatus.CANCELLED.value
             ]
+            if command.action == Action.UPDATE_EVENT and command.target_query:
+                matching = self.events.search_events(
+                    session_id,
+                    command.target_query,
+                    event_type=command.event_type,
+                    limit=5,
+                )
+                matching_ids = {event.id for event in matching}
+                if matching_ids:
+                    candidates = [event for event in candidates if event.id in matching_ids]
         elif self._has_reference_pronoun(command.transcript):
             event_id = self.dialogue.get_last_referenced_event_id(session_id)
             event = self.events.get_owned(session_id, event_id) if event_id else None

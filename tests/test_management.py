@@ -240,6 +240,37 @@ def test_explicit_date_filters_model_candidate_ids_before_delete(db):
     assert assistant.events.get_owned(session_id, second.id).status == EventStatus.CANCELLED.value
 
 
+def test_update_filters_broad_model_candidates_by_target_query(db):
+    session_id = str(uuid4())
+    assistant = service(db)
+    target = assistant.execute(
+        session_id,
+        task_command("Проверить период", 20),
+        "user_text",
+    ).created_event
+    other = assistant.execute(
+        session_id,
+        task_command("Подготовить презентацию", 20),
+        "user_text",
+    ).created_event
+
+    result = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.UPDATE_EVENT,
+            transcript="Перенеси задачу проверить период на 30 октября",
+            target_query="проверить период",
+            candidate_event_ids=[target.id, other.id],
+        ),
+        "user_text",
+    )
+
+    assert result.needs_clarification is False
+    assert result.created_event.id == target.id
+    assert result.created_event.due_date == "2026-10-30"
+    assert assistant.events.get_owned(session_id, other.id).due_date == "2026-10-20"
+
+
 def test_cancel_phrase_clears_pending_without_calling_model(db):
     session_id = str(uuid4())
     model = ScriptedClient([])
