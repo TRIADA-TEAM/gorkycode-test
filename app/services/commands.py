@@ -17,6 +17,12 @@ WEEKDAY_ALIASES = {
 def normalize_command(command: AssistantCommand, now: datetime | None = None) -> AssistantCommand:
     """Map occasionally inconsistent model fields to application semantics."""
     transcript_text = normalize_text(command.transcript)
+    if (
+        command.action == Action.CLARIFY
+        and (transcript_text.startswith("найди ") or transcript_text.startswith("найти "))
+        and any(word in transcript_text for word in ("дело", "задач", "встреч", "напомин"))
+    ):
+        command = command.model_copy(update={"action": Action.SEARCH_EVENTS})
     if _is_list_request(transcript_text):
         command = command.model_copy(update={"action": Action.LIST_EVENTS})
     elif command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS} and not _has_event_query_intent(

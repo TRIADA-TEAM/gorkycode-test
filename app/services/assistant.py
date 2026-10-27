@@ -364,7 +364,11 @@ class AssistantService:
                 if (event := self.events.get_owned(session_id, event_id))
                 and event.status != EventStatus.CANCELLED.value
             ]
-            if command.action == Action.UPDATE_EVENT and command.target_query:
+            if command.action in {
+                Action.UPDATE_EVENT,
+                Action.DELETE_EVENT,
+                Action.COMPLETE_EVENT,
+            } and command.target_query:
                 matching = self.events.search_events(
                     session_id,
                     command.target_query,
@@ -397,7 +401,7 @@ class AssistantService:
 
     @staticmethod
     def _event_matches_datetime(event, expected_date, expected_time=None):
-        value = event.starts_at or event.due_date or event.due_at
+        value = event.starts_at or event.due_at or event.due_date
         if not value:
             return False
         event_datetime = datetime.fromisoformat(value)

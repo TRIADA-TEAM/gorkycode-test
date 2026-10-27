@@ -111,11 +111,29 @@ def test_search_uses_original_user_text_and_ranks_all_terms_first(db):
 
     result = service.search_events(session_id, "годовой отчет")
 
-    assert result[0].title == "Подготовить материалы"
-    assert {event.title for event in result} == {
-        "Подготовить материалы",
-        "Отправить отчет",
-    }
+    assert [event.title for event in result] == ["Подготовить материалы"]
+
+
+def test_search_prefers_results_matching_all_keywords(db):
+    session_id = str(uuid4())
+    service = EventService(db)
+    service.create_task(
+        session_id,
+        command(
+            title="Подготовить материалы",
+            transcript="Подготовить материалы по годовому отчету",
+        ),
+        "user_text",
+    )
+    service.create_task(
+        session_id,
+        command(title="Отправить отчет", transcript="Отправить отчет клиенту"),
+        "user_text",
+    )
+
+    result = service.search_events(session_id, "годовой отчет")
+
+    assert [event.title for event in result] == ["Подготовить материалы"]
 
 
 def test_search_respects_date_range(db):

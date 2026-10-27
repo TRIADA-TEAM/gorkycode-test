@@ -271,6 +271,51 @@ def test_update_filters_broad_model_candidates_by_target_query(db):
     assert assistant.events.get_owned(session_id, other.id).due_date == "2026-10-20"
 
 
+def test_delete_filters_model_candidates_by_target_query_and_datetime(db):
+    session_id = str(uuid4())
+    assistant = service(db)
+    target = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Напомни оплатить интернет 22 ноября в 10:00",
+            title="Оплатить интернет",
+            event_type=EventType.REMINDER,
+            due_date=datetime.fromisoformat("2026-11-22").date(),
+            due_at=datetime.fromisoformat("2026-11-22T10:00:00+03:00"),
+        ),
+        "user_text",
+    ).created_event
+    other = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Напомни оплатить интернет 23 ноября в 10:00",
+            title="Оплатить интернет",
+            event_type=EventType.REMINDER,
+            due_date=datetime.fromisoformat("2026-11-23").date(),
+            due_at=datetime.fromisoformat("2026-11-23T10:00:00+03:00"),
+        ),
+        "user_text",
+    ).created_event
+
+    result = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.DELETE_EVENT,
+            transcript="Удали напоминание оплатить интернет 22 ноября в 10:00",
+            target_query="оплатить интернет",
+            candidate_event_ids=[target.id, other.id],
+            event_type=EventType.REMINDER,
+        ),
+        "user_text",
+    )
+
+    assert result.created_event.id == target.id
+    assert assistant.events.get_owned(session_id, target.id).status == EventStatus.CANCELLED.value
+    assert assistant.events.get_owned(session_id, other.id).status == EventStatus.PENDING.value
+
+
 def test_cancel_phrase_clears_pending_without_calling_model(db):
     session_id = str(uuid4())
     model = ScriptedClient([])

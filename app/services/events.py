@@ -124,7 +124,17 @@ class EventService:
             all_terms_bonus = 2 if terms and matched == len(terms) else 0
             return exact_title + exact + matched + all_terms_bonus, -event.id
 
-        ranked = [event for event in base if score(event)[0] > 0]
+        scored = [(event, score(event)) for event in base if score(event)[0] > 0]
+        full_matches = [
+            (event, ranking)
+            for event, ranking in scored
+            if terms and all(
+                term in event.search_text
+                or word_stem(term) in {word_stem(item) for item in event.search_text.split()}
+                for term in terms
+            )
+        ]
+        ranked = [event for event, _ in (full_matches or scored)]
         ranked.sort(key=score, reverse=True)
         return ranked[:limit]
 
