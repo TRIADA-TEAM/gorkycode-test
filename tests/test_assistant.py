@@ -422,3 +422,81 @@ def test_audio_clarification_uses_pending_context(db):
     assert model.requests[0]["pending_action"]["title"] == "Сходить в магазин"
     assert result.needs_clarification is False
     assert result.created_event.due_date == "2026-10-15"
+
+
+def test_explicit_new_event_replaces_pending_creation(db):
+    session_id = str(uuid4())
+    client = ScriptedClient([
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Напомни сегодня в 10 оплатить интернет",
+            title="Оплатить интернет",
+            event_type=EventType.REMINDER,
+        ),
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Добавь встречу с Марусей",
+            title="Встреча с Марусей",
+            event_type=EventType.MEETING,
+        ),
+    ])
+    now = datetime.fromisoformat("2026-10-28T18:49:00+03:00")
+    service = AssistantService(db, Settings(), client, lambda: now)
+
+    first = asyncio.run(
+        service.handle_text(session_id, "Напомни сегодня в 10 оплатить интернет")
+    )
+    second = asyncio.run(service.handle_text(session_id, "Добавь встречу с Марусей"))
+
+    assert first.needs_clarification is True
+    assert "прошли" in first.reply
+    assert second.action == Action.CREATE_MEETING.value
+    assert second.needs_clarification is True
+    assert second.reply == "На какую дату и время поставить встречу?"
+    pending = service.dialogue.get_pending(session_id)
+    assert pending["title"] == "Встреча с Марусей"
+    assert pending["starts_at"] is None
+
+
+def test_explicit_search_does_not_continue_pending_creation(db):
+    session_id = str(uuid4())
+    client = ScriptedClient([
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Найди встречу в кино с Марусей",
+            title="Встреча в кино с Марусей",
+            event_type=EventType.MEETING,
+        )
+    ])
+    service = AssistantService(db, Settings(), client, lambda: NOW)
+    service.events.create_meeting(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Добавь встречу в кино с Марусей 20 октября в 19:00",
+            title="Кино с Марусей",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-20T19:00:00+03:00"),
+        ),
+        "user_text",
+    )
+    service.dialogue.set_pending(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Добавь задачу купить билеты",
+            title="Купить билеты",
+            event_type=EventType.TASK,
+            missing_fields=["due_date"],
+            clarification_question="На какую дату поставить задачу?",
+        ),
+    )
+
+    result = asyncio.run(
+        service.handle_text(session_id, "Найди встречу в кино с Марусей")
+    )
+
+    assert result.action == Action.SEARCH_EVENTS.value
+    assert [event.title for event in result.events] == ["Кино с Марусей"]
+    assert result.created_event is None
+    assert service.dialogue.get_pending(session_id) is None

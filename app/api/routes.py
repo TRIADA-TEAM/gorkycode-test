@@ -8,7 +8,16 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_session_id
 from app.config import get_settings
 from app.db.session import get_db
-from app.domain.commands import AssistantResponse, EventResponse, EventType, TextRequest
+from app.domain.commands import (
+    Action,
+    AssistantCommand,
+    AssistantResponse,
+    EventEditRequest,
+    EventResponse,
+    EventStatus,
+    EventType,
+    TextRequest,
+)
 from app.integrations.gigachat import GigaChatClient, GigaChatError
 from app.integrations.polza import PolzaTranscriptionClient, TranscriptionError
 from app.services.assistant import AssistantService
@@ -98,3 +107,76 @@ async def events(
         session_id, event_type=event_type, limit=limit
     )
     return [EventResponse.model_validate(item) for item in items]
+
+
+def editable_event(db: Session, session_id: str, event_id: int):
+    item = EventService(db, get_settings().default_timezone).get_owned(
+        session_id, event_id
+    )
+    if item is None or item.status == EventStatus.CANCELLED.value:
+        raise HTTPException(status_code=404, detail="Событие не найдено")
+    return item
+
+
+@router.patch("/events/{event_id}", response_model=AssistantResponse)
+async def edit_event(
+    event_id: int,
+    body: EventEditRequest,
+    session_id: Annotated[str, Depends(get_session_id)],
+    db: Annotated[Session, Depends(get_db)],
+) -> AssistantResponse:
+    item = editable_event(db, session_id, event_id)
+    parts = ["Измени событие"]
+    if body.event_date:
+        parts.append(body.event_date.strftime("на %d.%m.%Y"))
+    if body.event_time:
+        parts.append(body.event_time.strftime("в %H:%M"))
+    return assistant_service(db).execute(
+        session_id,
+        AssistantCommand(
+            action=Action.UPDATE_EVENT,
+            transcript=" ".join(parts),
+            event_type=EventType(item.type),
+            target_event_id=event_id,
+            new_title=body.title,
+        ),
+        "user_text",
+    )
+
+
+@router.delete("/events/{event_id}", response_model=AssistantResponse)
+async def delete_event(
+    event_id: int,
+    session_id: Annotated[str, Depends(get_session_id)],
+    db: Annotated[Session, Depends(get_db)],
+) -> AssistantResponse:
+    item = editable_event(db, session_id, event_id)
+    return assistant_service(db).execute(
+        session_id,
+        AssistantCommand(
+            action=Action.DELETE_EVENT,
+            transcript=f"Удали событие {item.title}",
+            event_type=EventType(item.type),
+            target_event_id=event_id,
+        ),
+        "user_text",
+    )
+
+
+@router.post("/events/{event_id}/complete", response_model=AssistantResponse)
+async def complete_event(
+    event_id: int,
+    session_id: Annotated[str, Depends(get_session_id)],
+    db: Annotated[Session, Depends(get_db)],
+) -> AssistantResponse:
+    item = editable_event(db, session_id, event_id)
+    return assistant_service(db).execute(
+        session_id,
+        AssistantCommand(
+            action=Action.COMPLETE_EVENT,
+            transcript=f"Отметь выполненным {item.title}",
+            event_type=EventType(item.type),
+            target_event_id=event_id,
+        ),
+        "user_text",
+    )

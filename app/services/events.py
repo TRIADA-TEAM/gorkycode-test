@@ -78,11 +78,20 @@ class EventService:
         conditions.append(Event.status.in_([status.value for status in allowed_statuses]))
         if event_type:
             conditions.append(Event.type == event_type.value)
-        event_date = func.substr(func.coalesce(moment, fallback_moment, date_only), 1, 10)
+        event_moment = func.coalesce(moment, fallback_moment, date_only)
+        event_date = func.substr(event_moment, 1, 10)
         if date_from:
-            conditions.append(event_date >= date_from.date().isoformat())
+            if date_from.time() == datetime.min.time():
+                conditions.append(event_date >= date_from.date().isoformat())
+            else:
+                conditions.append(event_moment >= iso(date_from))
         if date_to:
-            conditions.append(event_date <= date_to.date().isoformat())
+            if date_to.time().replace(microsecond=0) == datetime.max.time().replace(
+                microsecond=0
+            ):
+                conditions.append(event_date <= date_to.date().isoformat())
+            else:
+                conditions.append(event_moment <= iso(date_to))
         stmt = (
             select(Event)
             .where(and_(*conditions))
@@ -134,7 +143,11 @@ class EventService:
                 for term in terms
             )
         ]
-        ranked = [event for event, _ in (full_matches or scored)]
+        # Multi-word searches identify one concrete subject. Returning a record
+        # that matches only "кино" but not "Иван" is more misleading than an
+        # empty result, so partial fallback is reserved for one-term queries.
+        selected = full_matches if len(terms) > 1 else scored
+        ranked = [event for event, _ in selected]
         ranked.sort(key=score, reverse=True)
         return ranked[:limit]
 

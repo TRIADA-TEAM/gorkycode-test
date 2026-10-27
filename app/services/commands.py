@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, time, timedelta
 
 from app.domain.commands import Action, AssistantCommand, EventType
@@ -21,16 +22,14 @@ def normalize_command(
 ) -> AssistantCommand:
     """Map occasionally inconsistent model fields to application semantics."""
     transcript_text = normalize_text(source_text or command.transcript)
-    if (
-        command.action == Action.CLARIFY
-        and (transcript_text.startswith("найди ") or transcript_text.startswith("найти "))
-        and any(word in transcript_text for word in ("дело", "дела", "задач", "встреч", "напомин"))
-    ):
+    if _is_search_request(transcript_text):
         command = command.model_copy(update={"action": Action.SEARCH_EVENTS})
     if _is_list_request(transcript_text):
         command = command.model_copy(update={"action": Action.LIST_EVENTS})
-    elif command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS} and not _has_event_query_intent(
-        transcript_text
+    elif (
+        command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS}
+        and not _has_event_query_intent(transcript_text)
+        and not _is_search_request(transcript_text)
     ):
         return command.model_copy(
             update={
@@ -149,6 +148,11 @@ def normalize_command(
             relative_period = _relative_period(source_text or command.transcript, now)
             if relative_period["date_from"] is not None:
                 updates.update(relative_period)
+            elif direction := _temporal_direction(text):
+                if direction == "past":
+                    updates.update({"date_from": None, "date_to": now})
+                else:
+                    updates.update({"date_from": now, "date_to": None})
             elif not parse_datetime_parts(source_text or command.transcript, now).has_explicit_date:
                 # A generic list/search request means all available events. Do not
                 # trust a date range invented by the provider.
@@ -212,6 +216,22 @@ def _has_event_query_intent(text: str) -> bool:
     )
 
 
+def _is_search_request(text: str) -> bool:
+    explicit_search = text.startswith(("найди ", "найти ", "поищи ", "поиск "))
+    temporal_search = bool(
+        re.search(r"\bкогда\s+(?:был[аои]?|будет|будут|прошл[аои]?|предстоит)\b", text)
+    )
+    return explicit_search or temporal_search
+
+
+def _temporal_direction(text: str) -> str | None:
+    if re.search(r"\b(?:был|была|было|были|прошел|прошла|прошло|прошли)\b", text):
+        return "past"
+    if re.search(r"\b(?:будет|будут|предстоит|предстоят)\b", text):
+        return "future"
+    return None
+
+
 def clarification_question(event_type: EventType, missing: list[str]) -> str | None:
     if not missing:
         return None
@@ -250,6 +270,15 @@ def _is_past(
 
 
 def _relative_period(text_value: str, now: datetime) -> dict:
+    exact = parse_datetime_parts(text_value, now)
+    if exact.date_value and not exact.invalid_date:
+        tz = now.tzinfo
+        return {
+            "date_from": datetime.combine(exact.date_value, time.min, tzinfo=tz),
+            "date_to": datetime.combine(
+                exact.date_value, time(23, 59, 59), tzinfo=tz
+            ),
+        }
     parsed = parse_period(text_value, now)
     if parsed.start is None:
         text = normalize_text(text_value)

@@ -454,3 +454,55 @@ def test_past_task_date_is_rejected():
     assert result.missing_fields == ["past_date"]
     assert result.due_date == datetime.fromisoformat("2026-10-10").date()
     assert result.clarification_question == "Указанная дата уже прошла. Укажите будущую дату."
+
+
+def test_explicit_search_overrides_wrong_creation_action():
+    command = AssistantCommand(
+        action=Action.CREATE_MEETING,
+        transcript="Найди встречу в кино с Марусей",
+        title="Встреча в кино с Марусей",
+        event_type=EventType.MEETING,
+        starts_at=datetime.fromisoformat("2026-10-29T18:00:00+03:00"),
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-28T12:00:00+03:00")
+    )
+
+    assert result.action == Action.SEARCH_EVENTS
+    assert result.event_type == EventType.MEETING
+    assert result.query == "кино марусей"
+    assert result.starts_at is None
+
+
+def test_past_search_is_limited_to_events_before_current_time():
+    command = AssistantCommand(
+        action=Action.CREATE_MEETING,
+        transcript="Когда было кино?",
+        title="Кино",
+        event_type=EventType.MEETING,
+    )
+    now = datetime.fromisoformat("2026-10-28T18:49:00+03:00")
+
+    result = normalize_command(command, now)
+
+    assert result.action == Action.SEARCH_EVENTS
+    assert result.query == "кино"
+    assert result.date_from is None
+    assert result.date_to == now
+
+
+def test_future_search_is_limited_to_events_after_current_time():
+    command = AssistantCommand(
+        action=Action.CLARIFY,
+        transcript="Когда будет кино?",
+        clarification_question="Уточните запрос",
+    )
+    now = datetime.fromisoformat("2026-10-28T18:49:00+03:00")
+
+    result = normalize_command(command, now)
+
+    assert result.action == Action.SEARCH_EVENTS
+    assert result.query == "кино"
+    assert result.date_from == now
+    assert result.date_to is None

@@ -233,3 +233,60 @@ def test_pending_action_expires_after_ttl(db):
 
     assert active.get_pending(session_id) is not None
     assert expired.get_pending(session_id) is None
+
+
+def test_search_time_boundary_separates_past_and_future_today(db):
+    session_id = str(uuid4())
+    service = EventService(db)
+    service.create_meeting(
+        session_id,
+        command(
+            title="Кино утром",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-28T17:00:00+03:00"),
+            due_at=None,
+        ),
+        "user_text",
+    )
+    service.create_meeting(
+        session_id,
+        command(
+            title="Кино вечером",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-28T20:00:00+03:00"),
+            due_at=None,
+        ),
+        "user_text",
+    )
+    now = datetime.fromisoformat("2026-10-28T18:49:00+03:00")
+
+    past = service.search_events(session_id, "кино", date_to=now)
+    future = service.search_events(session_id, "кино", date_from=now)
+
+    assert [event.title for event in past] == ["Кино утром"]
+    assert [event.title for event in future] == ["Кино вечером"]
+
+
+def test_search_requires_person_name_when_it_is_in_query(db):
+    session_id = str(uuid4())
+    service = EventService(db)
+    service.create_meeting(
+        session_id,
+        command(
+            title="Кино с Марусей",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-30T19:00:00+03:00"),
+            due_at=None,
+        ),
+        "user_text",
+    )
+
+    with_marusya = service.search_events(
+        session_id, "встреча в кино с Марусей", event_type=EventType.MEETING
+    )
+    with_ivan = service.search_events(
+        session_id, "встреча в кино с Иваном", event_type=EventType.MEETING
+    )
+
+    assert [event.title for event in with_marusya] == ["Кино с Марусей"]
+    assert with_ivan == []

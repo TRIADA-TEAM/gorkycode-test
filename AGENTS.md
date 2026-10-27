@@ -157,6 +157,14 @@ Current provisional time rules:
   confirmation; meetings whose boundaries merely touch are not overlapping;
 - rejecting a conflict confirmation or saying `не надо` clears the pending
   operation without calling the language model;
+- explicit search phrases (`найди`, `поищи`, `когда было`, `когда будет`) take
+  precedence over a provider-proposed creation action. Past/future search is
+  filtered against the current timestamp, not only the calendar date;
+- an exact date in a search request (for example `20 октября` or `02.11.2026`)
+  selects that one day and must not be expanded to the entire named month;
+- an explicit new creation command (`добавь`, `создай`, `поставь`, `напомни`,
+  `назначь`, `запланируй`) replaces an unfinished creation instead of inheriting
+  its date or time. The new event must independently provide all required data;
 - relative-date behavior will be refined later and must be covered by tests with
   a fixed application clock.
 
@@ -178,6 +186,13 @@ Current provisional time rules:
   preserved so the user can provide a corrected value.
 - If an update, delete, or completion command does not identify a target, ask
   which event is meant. Never silently select the only stored event.
+- Event cards expose deterministic `Изменить`, `Удалить`, and, for tasks and
+  reminders, `Выполнено` controls. These controls call session-isolated event
+  endpoints directly and do not ask GigaChat to infer the intended operation.
+- The direct event API is `PATCH /api/events/{id}`, `DELETE /api/events/{id}`,
+  and `POST /api/events/{id}/complete`. Editing accepts `title`, `event_date`,
+  and `event_time`; the same business validation for past dates and meeting
+  conflicts applies.
 
 ## Search plan
 
@@ -186,7 +201,9 @@ Use deterministic search, not RAG:
 1. Assign normalized tags when importing or creating an event.
 2. Filter by event type, date range, and session ownership.
 3. Search tags and normalized event text in the current anonymous session.
-4. Return a small ranked result set.
+4. Multi-word queries require every meaningful term to match. Do not return
+   `кино с Марусей` for `кино с Иваном` merely because `кино` matches.
+5. Return a small ranked result set.
 
 SQLite FTS5, embeddings, a vector database, and RAG are not required for this
 test project. Reconsider them only if deterministic search proves insufficient.

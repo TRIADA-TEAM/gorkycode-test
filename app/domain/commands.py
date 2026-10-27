@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -66,6 +66,18 @@ class AssistantCommand(BaseModel):
 
 class TextRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
+
+
+class EventEditRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    event_date: date | None = None
+    event_time: time | None = None
+
+    @model_validator(mode="after")
+    def require_changes(self) -> "EventEditRequest":
+        if self.title is None and self.event_date is None and self.event_time is None:
+            raise ValueError("at least one event field is required")
+        return self
 
 
 class EventResponse(BaseModel):

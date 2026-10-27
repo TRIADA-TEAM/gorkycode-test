@@ -73,14 +73,7 @@ function addMessage(role, text, events = [], timestamp = new Date()) {
     const list = document.createElement("div");
     list.className = "events";
     for (const event of events) {
-      const card = document.createElement("div");
-      card.className = "event";
-      const title = document.createElement("strong");
-      title.textContent = event.title;
-      const meta = document.createElement("small");
-      meta.textContent = formatEvent(event);
-      card.append(title, meta);
-      list.appendChild(card);
+      list.appendChild(createEventCard(event));
     }
     article.appendChild(list);
   }
@@ -92,6 +85,113 @@ function addMessage(role, text, events = [], timestamp = new Date()) {
   article.appendChild(time);
   chat.appendChild(article);
   chat.scrollTop = chat.scrollHeight;
+}
+
+function createEventCard(event) {
+  const card = document.createElement("div");
+  card.className = "event";
+  renderEventCard(card, event);
+  return card;
+}
+
+function renderEventCard(card, event) {
+  card.replaceChildren();
+  const title = document.createElement("strong");
+  title.textContent = event.title;
+  const meta = document.createElement("small");
+  meta.textContent = formatEvent(event);
+  const actions = document.createElement("div");
+  actions.className = "event-actions";
+  const editButton = eventButton("Изменить", "secondary");
+  editButton.addEventListener("click", () => showEventEditor(card, event));
+  actions.appendChild(editButton);
+  if (event.type !== "meeting" && event.status === "pending") {
+    const completeButton = eventButton("Выполнено", "secondary");
+    completeButton.addEventListener("click", async () => {
+      await runEventAction(card, `/api/events/${event.id}/complete`, {method: "POST"});
+    });
+    actions.appendChild(completeButton);
+  }
+  const deleteButton = eventButton("Удалить", "danger");
+  deleteButton.addEventListener("click", async () => {
+    if (!confirm(`Удалить «${event.title}»?`)) return;
+    await runEventAction(card, `/api/events/${event.id}`, {method: "DELETE"}, true);
+  });
+  actions.appendChild(deleteButton);
+  card.append(title, meta, actions);
+}
+
+function eventButton(label, variant) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `event-button ${variant}`;
+  button.textContent = label;
+  return button;
+}
+
+function showEventEditor(card, event) {
+  const moment = event.starts_at || event.due_at || "";
+  const form = document.createElement("form");
+  form.className = "event-editor";
+  const title = editorField("Название", "text", event.title, true);
+  const date = editorField("Дата", "date", event.due_date || moment.slice(0, 10));
+  const time = editorField("Время", "time", moment.includes("T") ? moment.slice(11, 16) : "");
+  form.append(title.label, date.label, time.label);
+  const buttons = document.createElement("div");
+  buttons.className = "event-actions";
+  const save = eventButton("Сохранить", "primary");
+  save.type = "submit";
+  const cancel = eventButton("Отмена", "secondary");
+  cancel.addEventListener("click", () => renderEventCard(card, event));
+  buttons.append(save, cancel);
+  form.appendChild(buttons);
+  form.addEventListener("submit", async (submitEvent) => {
+    submitEvent.preventDefault();
+    const body = {title: title.input.value.trim()};
+    if (date.input.value) body.event_date = date.input.value;
+    if (time.input.value) body.event_time = time.input.value;
+    await runEventAction(card, `/api/events/${event.id}`, {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+  });
+  card.replaceChildren(form);
+  title.input.focus();
+}
+
+function editorField(text, type, value, required = false) {
+  const label = document.createElement("label");
+  label.textContent = text;
+  const input = document.createElement("input");
+  input.type = type;
+  input.value = value || "";
+  input.required = required;
+  label.appendChild(input);
+  return {label, input};
+}
+
+async function runEventAction(card, url, options, remove = false) {
+  const buttons = card.querySelectorAll("button");
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {...(options.headers || {}), "X-Session-ID": sessionId},
+    });
+    const data = await parseResponse(response);
+    addMessage("assistant", data.reply);
+    if (remove || data.created_event?.status !== "pending") {
+      card.remove();
+    } else if (data.created_event) {
+      renderEventCard(card, data.created_event);
+    } else {
+      buttons.forEach((button) => { button.disabled = false; });
+    }
+  } catch (error) {
+    addMessage("assistant", `Ошибка: ${error.message}`);
+    buttons.forEach((button) => { button.disabled = false; });
+  }
 }
 
 function moscowDateKey(value) {
@@ -134,7 +234,7 @@ function formatEvent(event) {
   if (!moment && event.due_date) return `${event.type} · ${formatDateOnly(event.due_date)}`;
   if (!moment) return event.type;
   const date = new Date(moment);
-  return `${event.type} · ${date.toLocaleString("ru-RU")}`;
+  return `${event.type} · ${date.toLocaleString("ru-RU", {timeZone: MESSAGE_TIME_ZONE})}`;
 }
 
 function formatDateOnly(value) {

@@ -19,8 +19,9 @@ from app.domain.commands import (
 from app.integrations.polza import TranscriptionError
 from app.services.commands import (
     DEFAULT_TITLES,
-    _has_event_query_intent,
+    _is_list_request,
     _is_past,
+    _is_search_request,
     clarification_question,
     detect_event_type,
     normalize_command,
@@ -554,11 +555,13 @@ class AssistantService:
         normalized = normalize_command(command, now, source_text=source_text)
         if pending:
             pending_command = AssistantCommand.model_validate(pending)
+            user_text = normalize_text(source_text or command.transcript)
             is_explicit_query = normalized.action in {
                 Action.LIST_EVENTS,
                 Action.SEARCH_EVENTS,
-            } and _has_event_query_intent(normalize_text(command.transcript))
-            if not is_explicit_query:
+            } and (_is_list_request(user_text) or _is_search_request(user_text))
+            starts_new_creation = self._starts_new_creation(user_text, normalized)
+            if not is_explicit_query and not starts_new_creation:
                 if pending_command.action in {
                     Action.UPDATE_EVENT,
                     Action.DELETE_EVENT,
@@ -584,6 +587,16 @@ class AssistantService:
             normalized.missing_fields,
         )
         return normalized
+
+    @staticmethod
+    def _starts_new_creation(text: str, command: AssistantCommand) -> bool:
+        if command.action not in {Action.CREATE_TASK, Action.CREATE_MEETING}:
+            return False
+        creation_markers = (
+            "добавь", "создай", "поставь", "напомни", "назначь",
+            "запланируй", "добавить", "создать", "поставить",
+        )
+        return any(marker in text.split() for marker in creation_markers)
 
     @staticmethod
     def _merge_management_pending(
