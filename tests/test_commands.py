@@ -177,6 +177,24 @@ def test_generic_planned_events_is_always_a_list_request():
     assert result.missing_fields == []
 
 
+def test_text_search_for_case_is_detected_even_when_provider_returns_clarify():
+    command = AssistantCommand(
+        action=Action.CLARIFY,
+        transcript="Не JSON",
+        clarification_question="Уточните запрос",
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Найди дело по материалам",
+    )
+
+    assert result.action == Action.SEARCH_EVENTS
+    assert result.event_type == EventType.TASK
+    assert result.query == "материалам"
+
+
 def test_generic_planned_events_removes_model_invented_date_range():
     command = AssistantCommand(
         action=Action.LIST_EVENTS,

@@ -85,7 +85,7 @@ class AssistantService:
             now_iso=self._now_iso(),
             pending_action=pending,
         )
-        command = self._normalize_and_log(command, pending)
+        command = self._normalize_and_log(command, pending, source_text=text)
         return self.execute(session_id, command, "user_text")
 
     async def handle_audio(
@@ -545,10 +545,13 @@ class AssistantService:
         return datetime.now(ZoneInfo(self.settings.default_timezone))
 
     def _normalize_and_log(
-        self, command: AssistantCommand, pending: dict | None = None
+        self,
+        command: AssistantCommand,
+        pending: dict | None = None,
+        source_text: str | None = None,
     ) -> AssistantCommand:
         now = self._now()
-        normalized = normalize_command(command, now)
+        normalized = normalize_command(command, now, source_text=source_text)
         if pending:
             pending_command = AssistantCommand.model_validate(pending)
             is_explicit_query = normalized.action in {

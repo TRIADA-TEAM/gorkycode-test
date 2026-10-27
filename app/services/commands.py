@@ -14,13 +14,17 @@ WEEKDAY_ALIASES = {
     "суббота": 5, "субботу": 5, "субботы": 5,
     "воскресенье": 6, "воскресенья": 6,
 }
-def normalize_command(command: AssistantCommand, now: datetime | None = None) -> AssistantCommand:
+def normalize_command(
+    command: AssistantCommand,
+    now: datetime | None = None,
+    source_text: str | None = None,
+) -> AssistantCommand:
     """Map occasionally inconsistent model fields to application semantics."""
-    transcript_text = normalize_text(command.transcript)
+    transcript_text = normalize_text(source_text or command.transcript)
     if (
         command.action == Action.CLARIFY
         and (transcript_text.startswith("найди ") or transcript_text.startswith("найти "))
-        and any(word in transcript_text for word in ("дело", "задач", "встреч", "напомин"))
+        and any(word in transcript_text for word in ("дело", "дела", "задач", "встреч", "напомин"))
     ):
         command = command.model_copy(update={"action": Action.SEARCH_EVENTS})
     if _is_list_request(transcript_text):
@@ -128,10 +132,10 @@ def normalize_command(command: AssistantCommand, now: datetime | None = None) ->
                 updates.update({"due_at": command.starts_at, "starts_at": None, "ends_at": None})
 
     if command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS}:
-        text = normalize_text(command.transcript)
+        text = normalize_text(source_text or command.transcript)
         if "встреч" in text:
             updates["event_type"] = EventType.MEETING
-        elif "задач" in text:
+        elif "задач" in text or "дел" in text:
             updates["event_type"] = EventType.TASK
         elif "напомин" in text:
             updates["event_type"] = EventType.REMINDER
@@ -151,7 +155,7 @@ def normalize_command(command: AssistantCommand, now: datetime | None = None) ->
                 updates.update({"date_from": None, "date_to": None})
 
         if command.action == Action.SEARCH_EVENTS:
-            updates["query"] = extract_search_query(command.transcript)
+            updates["query"] = extract_search_query(source_text or command.transcript)
 
     return command.model_copy(update=updates)
 
@@ -201,7 +205,7 @@ def _is_list_request(text: str) -> bool:
 def _has_event_query_intent(text: str) -> bool:
     if _is_list_request(text):
         return True
-    event_words = ("событ", "задач", "напомин", "встреч", "план")
+    event_words = ("событ", "задач", "дел", "напомин", "встреч", "план")
     query_words = ("найди", "найти", "поиск", "покажи", "когда", "есть ли", "что у меня")
     return any(word in text for word in event_words) and any(
         word in text for word in query_words
