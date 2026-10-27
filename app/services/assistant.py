@@ -568,7 +568,9 @@ class AssistantService:
                         command, pending_command
                     )
                 else:
-                    normalized = self._merge_pending(normalized, pending_command, now)
+                    normalized = self._merge_pending(
+                        normalized, pending_command, now, source_text=source_text
+                    )
         logger.info(
             "assistant_command action=%s type=%s title=%r due_at=%s starts_at=%s "
             "date_from=%s date_to=%s missing=%s",
@@ -620,10 +622,14 @@ class AssistantService:
 
     @staticmethod
     def _merge_pending(
-        current: AssistantCommand, pending: AssistantCommand, now: datetime
+        current: AssistantCommand,
+        pending: AssistantCommand,
+        now: datetime,
+        source_text: str | None = None,
     ) -> AssistantCommand:
-        parsed = parse_datetime_parts(current.transcript, now)
-        explicit_type = detect_event_type(current.transcript)
+        answer_text = source_text or current.transcript
+        parsed = parse_datetime_parts(answer_text, now)
+        explicit_type = detect_event_type(answer_text)
         event_type = explicit_type or pending.event_type or current.event_type
         action = (
             Action.CREATE_MEETING

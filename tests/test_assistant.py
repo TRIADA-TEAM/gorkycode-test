@@ -308,6 +308,43 @@ def test_pending_task_treats_clarify_response_as_context_answer(db):
     assert second.created_event.due_date == "2026-10-15"
 
 
+def test_pending_reminder_uses_original_time_answer(db):
+    session_id = str(uuid4())
+    client = ScriptedClient(
+        [
+            AssistantCommand(
+                action=Action.CREATE_TASK,
+                transcript="Напомни завтра подготовить документы",
+                title="Подготовить документы",
+                event_type=EventType.REMINDER,
+                due_date=datetime.fromisoformat("2026-10-16").date(),
+                missing_fields=["due_time"],
+                clarification_question="На какое время поставить напоминание?",
+            ),
+            AssistantCommand(
+                action=Action.CLARIFY,
+                transcript="Уточните время",
+                clarification_question="На какое время поставить напоминание?",
+            ),
+        ]
+    )
+    clock = lambda: NOW
+
+    first = asyncio.run(
+        AssistantService(db, Settings(), client, clock).handle_text(
+            session_id, "Напомни завтра подготовить документы"
+        )
+    )
+    second = asyncio.run(
+        AssistantService(db, Settings(), client, clock).handle_text(session_id, "12 утра")
+    )
+
+    assert first.needs_clarification is True
+    assert second.needs_clarification is False
+    assert second.created_event.type == EventType.REMINDER.value
+    assert second.created_event.due_at == "2026-10-16T12:00:00+03:00"
+
+
 def test_audio_is_transcribed_before_command_interpretation(db):
     session_id = str(uuid4())
     transcript = "Добавь задачу сходить в магазин завтра"
