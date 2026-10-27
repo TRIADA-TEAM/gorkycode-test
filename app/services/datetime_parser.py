@@ -1,3 +1,4 @@
+import calendar
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -49,6 +50,12 @@ class ParsedDateTime:
     has_explicit_date: bool = False
     has_explicit_time: bool = False
     invalid_date: bool = False
+
+
+@dataclass(frozen=True)
+class ParsedPeriod:
+    start: date | None = None
+    end: date | None = None
 
 
 def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
@@ -144,6 +151,92 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         has_explicit_time=time_value is not None,
         invalid_date=invalid_date,
     )
+
+
+def parse_period(value: str, now: datetime) -> ParsedPeriod:
+    """Resolve a list/search period without relying on provider date ranges."""
+    text = " ".join(value.lower().replace("ё", "е").split())
+    today = now.date()
+
+    if "на следующий день" in text or "следующий день" in text:
+        target = today + timedelta(days=1)
+        return ParsedPeriod(target, target)
+    if "сегодня" in text:
+        return ParsedPeriod(today, today)
+    if "вчера" in text:
+        target = today - timedelta(days=1)
+        return ParsedPeriod(target, target)
+    if "послезавтра" in text:
+        target = today + timedelta(days=2)
+        return ParsedPeriod(target, target)
+    if "завтра" in text:
+        target = today + timedelta(days=1)
+        return ParsedPeriod(target, target)
+
+    if "на следующей неделе" in text or "следующую неделю" in text:
+        start = today + timedelta(days=7 - now.weekday())
+        return ParsedPeriod(start, start + timedelta(days=6))
+    if "на этой неделе" in text or "эту неделю" in text:
+        start = today - timedelta(days=now.weekday())
+        return ParsedPeriod(start, start + timedelta(days=6))
+
+    month = _month_in_text(text)
+    if month:
+        year = now.year if month >= now.month else now.year + 1
+        first = date(year, month, 1)
+        last = date(year, month, calendar.monthrange(year, month)[1])
+        week = re.search(r"(?:перв|втор|треть|четверт|последн)\w*\s+недел", text)
+        if week:
+            ordinal = week.group(0)
+            if ordinal.startswith("перв"):
+                number = 1
+            elif ordinal.startswith("втор"):
+                number = 2
+            elif ordinal.startswith("треть"):
+                number = 3
+            elif ordinal.startswith("четверт"):
+                number = 4
+            else:
+                number = (last.day - 1) // 7 + 1
+            start_day = 1 + (number - 1) * 7
+            if start_day > last.day:
+                return ParsedPeriod(first, last)
+            return ParsedPeriod(
+                date(year, month, start_day),
+                min(date(year, month, start_day) + timedelta(days=6), last),
+            )
+        return ParsedPeriod(first, last)
+
+    seasons = {
+        "зим": (12, 1, 2),
+        "весн": (3, 4, 5),
+        "лет": (6, 7, 8),
+        "осен": (9, 10, 11),
+    }
+    for stem, months in seasons.items():
+        if stem not in text:
+            continue
+        if months[0] == 12:
+            year = now.year if now.month == 12 else now.year if now.month > 12 else now.year
+            if now.month <= 2:
+                year = now.year - 1
+            elif now.month >= 3:
+                year = now.year
+            start = date(year, 12, 1)
+            end = date(year + 1, 2, calendar.monthrange(year + 1, 2)[1])
+        else:
+            start_year = now.year if now.month <= months[-1] else now.year + 1
+            start = date(start_year, months[0], 1)
+            end = date(start_year, months[-1], calendar.monthrange(start_year, months[-1])[1])
+        return ParsedPeriod(start, end)
+    return ParsedPeriod()
+
+
+def _month_in_text(text: str) -> int | None:
+    for stem, month in MONTHS.items():
+        if re.search(rf"\b{stem}\w*\b", text):
+            return month
+    return None
 
 
 def combine(date_value: date, time_value: time, now: datetime) -> datetime:

@@ -1,7 +1,7 @@
 from datetime import datetime, time, timedelta
 
 from app.domain.commands import Action, AssistantCommand, EventType
-from app.services.datetime_parser import combine, parse_datetime_parts
+from app.services.datetime_parser import ParsedPeriod, combine, parse_datetime_parts, parse_period
 from app.services.text import extract_search_query, normalize_text
 
 
@@ -240,32 +240,18 @@ def _is_past(
 
 
 def _relative_period(text_value: str, now: datetime) -> dict:
-    text = normalize_text(text_value)
-    start_date = end_date = None
-    if "сегодня" in text:
-        start_date = end_date = now.date()
-    elif "вчера" in text:
-        start_date = end_date = now.date() - timedelta(days=1)
-    elif "послезавтра" in text:
-        start_date = end_date = now.date() + timedelta(days=2)
-    elif "завтра" in text:
-        start_date = end_date = now.date() + timedelta(days=1)
-    elif "на следующей неделе" in text or "следующую неделю" in text:
-        start_date = now.date() + timedelta(days=7 - now.weekday())
-        end_date = start_date + timedelta(days=6)
-    elif "на этой неделе" in text or "эту неделю" in text:
-        start_date = now.date() - timedelta(days=now.weekday())
-        end_date = start_date + timedelta(days=6)
-    else:
+    parsed = parse_period(text_value, now)
+    if parsed.start is None:
+        text = normalize_text(text_value)
         for name, weekday in WEEKDAY_ALIASES.items():
             if name in text:
-                start_date = now.date() + timedelta(days=(weekday - now.weekday()) % 7 or 7)
-                end_date = start_date
+                start = now.date() + timedelta(days=(weekday - now.weekday()) % 7 or 7)
+                parsed = ParsedPeriod(start, start)
                 break
-    if start_date is None:
+    if parsed.start is None or parsed.end is None:
         return {"date_from": None, "date_to": None}
     tz = now.tzinfo
     return {
-        "date_from": datetime.combine(start_date, time.min, tzinfo=tz),
-        "date_to": datetime.combine(end_date, time(23, 59, 59), tzinfo=tz),
+        "date_from": datetime.combine(parsed.start, time.min, tzinfo=tz),
+        "date_to": datetime.combine(parsed.end, time(23, 59, 59), tzinfo=tz),
     }

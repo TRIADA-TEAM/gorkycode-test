@@ -1,6 +1,6 @@
 from datetime import date, datetime, time
 
-from app.services.datetime_parser import parse_datetime_parts
+from app.services.datetime_parser import parse_datetime_parts, parse_period
 
 
 NOW = datetime.fromisoformat("2026-10-15T12:00:00+03:00")
@@ -38,3 +38,34 @@ def test_invalid_calendar_date_is_reported():
 
     assert result.invalid_date is True
     assert result.date_value is None
+
+
+def test_next_day_period_is_one_calendar_day():
+    result = parse_period("Что у меня на следующий день?", NOW)
+
+    assert result.start == date(2026, 10, 16)
+    assert result.end == date(2026, 10, 16)
+
+
+def test_month_period_uses_the_requested_month():
+    result = parse_period("Покажи события на декабрь", NOW)
+
+    assert result.start == date(2026, 12, 1)
+    assert result.end == date(2026, 12, 31)
+
+
+def test_month_week_period_is_limited_to_seven_days():
+    first = parse_period("Покажи первую неделю декабря", NOW)
+    last = parse_period("Покажи последнюю неделю декабря", NOW)
+
+    assert first.start == date(2026, 12, 1)
+    assert first.end == date(2026, 12, 7)
+    assert last.start == date(2026, 12, 29)
+    assert last.end == date(2026, 12, 31)
+
+
+def test_winter_period_crosses_year_boundary():
+    result = parse_period("Что запланировано зимой", NOW)
+
+    assert result.start == date(2026, 12, 1)
+    assert result.end == date(2027, 2, 28)
