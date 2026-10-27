@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.base import DialogueSession, Event
 from app.domain.commands import AssistantCommand, EventStatus, EventType
-from app.services.text import extract_tags, normalize_text, word_stem
+from app.services.text import extract_search_query, extract_tags, normalize_text, word_stem
 
 
 def iso(value: datetime | None) -> str | None:
@@ -100,7 +100,7 @@ class EventService:
         event_type: EventType | None = None,
         limit: int = 20,
     ) -> list[Event]:
-        normalized = normalize_text(query)
+        normalized = extract_search_query(query)
         terms = [term for term in normalized.split() if len(term) >= 2]
         base = self.list_events(
             session_id,
@@ -114,12 +114,15 @@ class EventService:
         def score(event: Event) -> tuple[int, int]:
             text = event.search_text
             text_stems = {word_stem(term) for term in text.split()}
+            title_text = normalize_text(event.title)
+            exact_title = 5 if normalized and normalized in title_text else 0
             exact = 3 if normalized and normalized in text else 0
             matched = sum(
                 1 for term in terms
                 if term in text or word_stem(term) in text_stems
             )
-            return exact + matched, -event.id
+            all_terms_bonus = 2 if terms and matched == len(terms) else 0
+            return exact_title + exact + matched + all_terms_bonus, -event.id
 
         ranked = [event for event in base if score(event)[0] > 0]
         ranked.sort(key=score, reverse=True)
@@ -166,7 +169,6 @@ class EventService:
             event.title = title
             tags = extract_tags(title)
             event.tags = json.dumps(tags, ensure_ascii=False)
-            event.search_text = normalize_text(" ".join([title, *tags]))
         if event.type == EventType.MEETING.value:
             if starts_at is not None:
                 event.starts_at = iso(starts_at)
@@ -181,6 +183,7 @@ class EventService:
                 event.due_at = None
         if raw_text is not None:
             event.raw_user_text = raw_text
+        event.search_text = self._build_search_text(event.title, event.tags, event.raw_user_text)
         return self._persist(event, commit=commit)
 
     def set_status(
@@ -217,8 +220,16 @@ class EventService:
             status="pending",
             raw_user_text=raw_text,
             tags=json.dumps(tags, ensure_ascii=False),
-            search_text=normalize_text(" ".join([title, *tags])),
+            search_text=self._build_search_text(title, json.dumps(tags, ensure_ascii=False), raw_text),
         )
+
+    @staticmethod
+    def _build_search_text(title: str, tags_json: str, raw_text: str | None) -> str:
+        try:
+            tags = json.loads(tags_json)
+        except (TypeError, json.JSONDecodeError):
+            tags = []
+        return normalize_text(" ".join([title, *tags, raw_text or ""]))
 
     def _save(self, event: Event, *, commit: bool = True) -> Event:
         self.db.add(event)

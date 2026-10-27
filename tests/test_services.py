@@ -89,6 +89,35 @@ def test_search_uses_natural_language_subject_and_word_forms(db):
     assert service.search_events(session_id, "Когда у меня встреча с дизайнером?")[0].title == "Встреча с дизайнером"
 
 
+def test_search_uses_original_user_text_and_ranks_all_terms_first(db):
+    session_id = str(uuid4())
+    service = EventService(db)
+    service.create_task(
+        session_id,
+        command(
+            title="Подготовить материалы",
+            transcript="Подготовить материалы по годовому отчету",
+        ),
+        "user_text",
+    )
+    service.create_task(
+        session_id,
+        command(
+            title="Отправить отчет",
+            transcript="Отправить отчет клиенту",
+        ),
+        "user_text",
+    )
+
+    result = service.search_events(session_id, "годовой отчет")
+
+    assert result[0].title == "Подготовить материалы"
+    assert {event.title for event in result} == {
+        "Подготовить материалы",
+        "Отправить отчет",
+    }
+
+
 def test_search_respects_date_range(db):
     session_id = str(uuid4())
     service = EventService(db)
