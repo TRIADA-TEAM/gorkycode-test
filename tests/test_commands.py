@@ -213,7 +213,7 @@ def test_generic_period_uses_original_text_and_keeps_all_event_types():
     assert result.date_to == datetime.fromisoformat("2026-11-08T23:59:59+03:00")
 
 
-def test_generic_planned_events_removes_model_invented_date_range():
+def test_generic_planned_events_start_from_current_moment():
     command = AssistantCommand(
         action=Action.LIST_EVENTS,
         transcript="Какие запланированы события?",
@@ -221,12 +221,11 @@ def test_generic_planned_events_removes_model_invented_date_range():
         date_to=datetime.fromisoformat("2026-10-15T23:59:59+03:00"),
     )
 
-    result = normalize_command(
-        command, datetime.fromisoformat("2026-10-15T12:00:00+03:00")
-    )
+    now = datetime.fromisoformat("2026-10-15T12:00:00+03:00")
+    result = normalize_command(command, now)
 
     assert result.action == Action.LIST_EVENTS
-    assert result.date_from is None
+    assert result.date_from == now
     assert result.date_to is None
 
 

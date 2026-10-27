@@ -168,6 +168,10 @@ Current provisional time rules:
   filtered against the current timestamp, not only the calendar date;
 - an exact date in a search request (for example `20 октября` or `02.11.2026`)
   selects that one day and must not be expanded to the entire named month;
+- generic list wording with `запланировано` or `предстоит` returns events from
+  the current timestamp forward. `Было запланировано` returns past events;
+  `покажи события` remains unbounded. An explicit day or period takes priority
+  and returns that complete calendar range;
 - an explicit new creation command (`добавь`, `создай`, `поставь`, `напомни`,
   `назначь`, `запланируй`) replaces an unfinished creation instead of inheriting
   its date or time. The new event must independently provide all required data;

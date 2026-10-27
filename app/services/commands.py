@@ -194,6 +194,8 @@ def detect_event_type(value: str) -> EventType | None:
 def _is_list_request(text: str) -> bool:
     list_markers = (
         "какие запланированы",
+        "было запланировано",
+        "были запланированы",
         "какие события",
         "что запланировано",
         "что у меня",
@@ -227,7 +229,9 @@ def _is_search_request(text: str) -> bool:
 def _temporal_direction(text: str) -> str | None:
     if re.search(r"\b(?:был|была|было|были|прошел|прошла|прошло|прошли)\b", text):
         return "past"
-    if re.search(r"\b(?:будет|будут|предстоит|предстоят)\b", text):
+    if re.search(
+        r"\b(?:будет|будут|предстоит|предстоят|запланирован\w*)\b", text
+    ):
         return "future"
     return None
 

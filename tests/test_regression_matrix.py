@@ -88,3 +88,38 @@ def test_exact_search_date_is_not_expanded_to_whole_month(phrase, expected_date)
     assert result.date_to.date().isoformat() == expected_date
     assert result.date_from.time().isoformat() == "00:00:00"
     assert result.date_to.time().isoformat() == "23:59:59"
+
+
+@pytest.mark.parametrize(
+    ("phrase", "expected_from", "expected_to"),
+    [
+        ("Покажи запланированные события", NOW, None),
+        ("Какие встречи предстоят?", NOW, None),
+        ("Что у меня запланировано?", NOW, None),
+        ("Что было запланировано?", None, NOW),
+        ("Покажи события", None, None),
+    ],
+)
+def test_list_temporal_direction_matrix(phrase, expected_from, expected_to):
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript=phrase,
+    )
+
+    result = normalize_command(command, NOW)
+
+    assert result.action == Action.LIST_EVENTS
+    assert result.date_from == expected_from
+    assert result.date_to == expected_to
+
+
+def test_explicit_day_has_priority_over_planned_future_direction():
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript="Что было запланировано сегодня?",
+    )
+
+    result = normalize_command(command, NOW)
+
+    assert result.date_from == datetime.fromisoformat("2026-10-28T00:00:00+03:00")
+    assert result.date_to == datetime.fromisoformat("2026-10-28T23:59:59+03:00")
