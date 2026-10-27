@@ -478,6 +478,48 @@ body {
 }
 
 
+/* Give the conversation more room once the user starts scrolling on mobile. */
+@media (max-width: 560px) {
+  .app-shell,
+  .topbar,
+  .conversation-panel,
+  .conversation-intro {
+    transition: gap .2s ease, max-height .2s ease, min-height .2s ease,
+      padding .2s ease, margin .2s ease, opacity .16s ease;
+  }
+
+  .topbar {
+    max-height: 64px;
+    overflow: hidden;
+  }
+
+  .conversation-intro {
+    max-height: 220px;
+    overflow: hidden;
+  }
+
+  .app-shell.mobile-chat-scrolled {
+    gap: 4px;
+  }
+
+  .mobile-chat-scrolled .topbar,
+  .mobile-chat-scrolled .conversation-intro {
+    min-height: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin: 0;
+    opacity: 0;
+    border: 0;
+    pointer-events: none;
+  }
+
+  .mobile-chat-scrolled .conversation-panel {
+    gap: 6px;
+  }
+}
+
+
 .composer,
 .composer #send-button,
 .composer #record-button {
@@ -523,8 +565,6 @@ body {
     justify-content: center;
   }
 }
-
-
 @media (max-width: 560px) {
   .composer {
     display: flex;
@@ -560,6 +600,8 @@ body {
     grid-row: auto;
   }
 }
+
+
 
 @media (max-width: 560px) {
   .composer {

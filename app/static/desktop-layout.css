@@ -1,0 +1,115 @@
+/* Final wide-screen layout; loaded after legacy responsive overrides. */
+@media (min-width: 900px) {
+  body { overflow: hidden; }
+
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 32px);
+    min-height: 620px;
+    padding: 16px 22px 20px;
+    gap: 14px;
+  }
+
+  .topbar {
+    flex: 0 0 auto;
+    padding: 0 2px 12px;
+  }
+
+  .workspace {
+    display: block;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+  }
+
+  .conversation-panel {
+    display: grid !important;
+    grid-template-columns: minmax(280px, .72fr) minmax(0, 1.55fr);
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
+    column-gap: 28px;
+    row-gap: 12px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #e0e3ef;
+    border-radius: 10px;
+  }
+
+  .conversation-intro {
+    position: relative;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    padding: clamp(28px, 4vh, 48px) 28px;
+    overflow-y: auto;
+    background: linear-gradient(160deg, #fafaff 0%, #f1f3ff 100%);
+    border: 0;
+    border-right: 1px solid #e3e5f1;
+  }
+
+  .conversation-intro h1 {
+    max-width: 420px;
+    font-size: clamp(38px, 4vw, 58px);
+  }
+
+  .conversation-intro .subtitle { max-width: 420px; }
+
+  .conversation-intro .today-card {
+    position: static;
+    width: auto;
+    max-width: 360px;
+    margin-top: clamp(24px, 5vh, 48px);
+  }
+
+  .conversation-intro .suggestions {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 9px;
+    margin-top: 24px;
+    padding: 0;
+  }
+
+  .conversation-intro .suggestion-chip {
+    width: 100%;
+    max-width: 360px;
+    text-align: left;
+  }
+
+  .chat {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    margin: 0 24px 0 0;
+    padding: 22px 8px 18px 0;
+    overflow-y: auto;
+    border-top: 0;
+  }
+
+  .composer {
+    grid-column: 2;
+    grid-row: 2;
+    margin-right: 24px;
+  }
+
+  .footer-row {
+    grid-column: 2;
+    grid-row: 3;
+    margin-right: 24px;
+  }
+
+  .security-note-inline {
+    grid-column: 2;
+    grid-row: 4;
+    margin: 0 24px 16px 0;
+  }
+}

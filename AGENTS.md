@@ -48,6 +48,12 @@ Out of scope for the first version:
   through the same GigaChat interpretation flow as typed input.
 - UI: a minimal web page with a record button, text input, dialogue history,
   and visible event results.
+- Desktop UI uses two columns from 900 px: explanatory copy, hints, and example
+  commands on the left; a full-height chat with its composer kept visible on
+  the right. Narrow screens keep the compact single-column conversation.
+- On screens up to 560 px, scrolling the chat collapses the top bar and intro
+  after 24 px so the dialogue gains vertical space. Returning the chat to its
+  top restores them; the composer remains visible throughout.
 - Time zone: `Europe/Moscow` until the product rules are revisited.
 - No seed dataset or seed import is used. Tests create their own isolated data.
 

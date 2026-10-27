@@ -11,6 +11,26 @@ const sessionId = getSessionId();
 let recorder = null;
 let stream = null;
 let chunks = [];
+let mobileScrollFrame = null;
+
+const mobileLayout = window.matchMedia("(max-width: 560px)");
+
+function updateMobileChrome() {
+  const collapsed = mobileLayout.matches && chat.scrollTop > 24;
+  document.querySelector(".app-shell")?.classList.toggle(
+    "mobile-chat-scrolled", collapsed
+  );
+}
+
+chat.addEventListener("scroll", () => {
+  if (mobileScrollFrame !== null) return;
+  mobileScrollFrame = requestAnimationFrame(() => {
+    mobileScrollFrame = null;
+    updateMobileChrome();
+  });
+}, {passive: true});
+
+mobileLayout.addEventListener?.("change", updateMobileChrome);
 
 suggestionChips.forEach((chip) => {
   chip.addEventListener("click", () => {
@@ -85,6 +105,7 @@ function addMessage(role, text, events = [], timestamp = new Date()) {
   article.appendChild(time);
   chat.appendChild(article);
   chat.scrollTop = chat.scrollHeight;
+  updateMobileChrome();
 }
 
 function createEventCard(event) {

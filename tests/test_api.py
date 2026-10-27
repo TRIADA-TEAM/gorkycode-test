@@ -27,6 +27,33 @@ class StaticTranscriber:
         return "Добавь задачу купить молоко завтра"
 
 
+def test_desktop_split_layout_assets_are_served():
+    with TestClient(app) as client:
+        page = client.get("/")
+        styles = client.get("/static/styles.css")
+        desktop = client.get("/static/desktop-layout.css")
+
+    assert page.status_code == 200
+    assert page.text.count('class="suggestion-chip"') == 2
+    assert page.text.index('class="suggestions"') < page.text.index('id="chat"')
+    assert styles.status_code == 200
+    assert 'desktop-layout.css' in styles.text
+    assert desktop.status_code == 200
+    assert "grid-template-columns" in desktop.text
+
+
+def test_mobile_chat_collapse_assets_are_served():
+    with TestClient(app) as client:
+        script = client.get("/static/app.js")
+        responsive = client.get("/static/responsive.css")
+
+    assert script.status_code == 200
+    assert "mobile-chat-scrolled" in script.text
+    assert "chat.scrollTop > 24" in script.text
+    assert responsive.status_code == 200
+    assert ".mobile-chat-scrolled .topbar" in responsive.text
+
+
 def test_text_endpoint_preserves_clarification_between_requests(db, monkeypatch):
     session_id = str(uuid4())
     model = ScriptedClient(
