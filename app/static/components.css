@@ -15,6 +15,20 @@
   white-space: pre-wrap;
 }
 
+.message-time {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  text-align: right;
+  cursor: help;
+}
+
+.message.user .message-time {
+  color: rgba(255, 255, 255, .72);
+}
+
 .message-label {
   display: block;
   margin-bottom: 6px;

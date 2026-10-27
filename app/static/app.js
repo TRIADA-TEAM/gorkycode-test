@@ -52,7 +52,9 @@ function setBusy(busy, message = "Готов к работе") {
   statusNode.textContent = message;
 }
 
-function addMessage(role, text, events = []) {
+const MESSAGE_TIME_ZONE = "Europe/Moscow";
+
+function addMessage(role, text, events = [], timestamp = new Date()) {
   const article = document.createElement("article");
   article.className = `message ${role}`;
   const p = document.createElement("p");
@@ -73,8 +75,49 @@ function addMessage(role, text, events = []) {
     }
     article.appendChild(list);
   }
+  const time = document.createElement("time");
+  time.className = "message-time";
+  time.dateTime = timestamp.toISOString();
+  time.textContent = formatMessageTime(timestamp);
+  time.title = formatFullMessageTime(timestamp);
+  article.appendChild(time);
   chat.appendChild(article);
   chat.scrollTop = chat.scrollHeight;
+}
+
+function moscowDateKey(value) {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: MESSAGE_TIME_ZONE,
+  }).format(value);
+}
+
+function formatMessageTime(value) {
+  const today = moscowDateKey(new Date());
+  const messageDate = moscowDateKey(value);
+  const time = new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit", minute: "2-digit", timeZone: MESSAGE_TIME_ZONE,
+  }).format(value);
+  if (messageDate === today) return time;
+
+  const dayDifference = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${messageDate}T00:00:00Z`)) / 86400000;
+  if (dayDifference === 1) return `Вчера, ${time}`;
+
+  const year = new Intl.DateTimeFormat("ru-RU", {
+    year: "numeric", timeZone: MESSAGE_TIME_ZONE,
+  }).format(value);
+  const currentYear = new Intl.DateTimeFormat("ru-RU", {
+    year: "numeric", timeZone: MESSAGE_TIME_ZONE,
+  }).format(new Date());
+  const date = new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric", month: "long", timeZone: MESSAGE_TIME_ZONE,
+  }).format(value);
+  return year === currentYear ? `${date}, ${time}` : `${date} ${year}, ${time}`;
+}
+
+function formatFullMessageTime(value) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "full", timeStyle: "short", timeZone: MESSAGE_TIME_ZONE,
+  }).format(value);
 }
 
 function formatEvent(event) {
