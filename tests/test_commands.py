@@ -274,6 +274,20 @@ def test_invalid_clock_time_requires_correction():
     assert "некорректно" in result.clarification_question
 
 
+def test_task_without_title_asks_for_content_before_date():
+    command = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Создай задачу без названия",
+        title=None,
+        event_type=EventType.TASK,
+    )
+
+    result = normalize_command(command, datetime.fromisoformat("2026-10-15T12:00:00+03:00"))
+
+    assert result.missing_fields == ["title", "due_date"]
+    assert result.clarification_question == "Что нужно сделать?"
+
+
 def test_past_meeting_question_is_detected_as_search():
     command = AssistantCommand(
         action=Action.CLARIFY,
@@ -478,7 +492,7 @@ def test_missing_title_uses_type_default():
     )
 
     assert result.title == "Встреча"
-    assert result.missing_fields == []
+    assert result.missing_fields == ["title"]
 
 
 def test_past_meeting_is_not_ready_to_save():

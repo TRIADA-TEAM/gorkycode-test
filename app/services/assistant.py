@@ -75,12 +75,18 @@ class AssistantService:
 
     async def handle_text(self, session_id: str, text: str) -> AssistantResponse:
         pending = self.dialogue.get_pending(session_id)
+        if pending and self._is_new_non_event_intent(text):
+            self.dialogue.clear_pending(session_id)
+            pending = None
         if pending and self._should_cancel_pending(text, pending):
             return self.execute(
                 session_id,
                 AssistantCommand(action=Action.CANCEL_ACTION, transcript=text),
                 "user_text",
             )
+        preflight = self._preflight_text(session_id, text, "user_text")
+        if preflight:
+            return preflight
         command = await self.client.interpret(
             text=text,
             now_iso=self._now_iso(),
@@ -98,6 +104,9 @@ class AssistantService:
         transcript = await self.transcription_client.transcribe(
             filename, content, content_type
         )
+        preflight = self._preflight_text(session_id, transcript, "user_audio")
+        if preflight:
+            return preflight
         if pending and self._should_cancel_pending(transcript, pending):
             return self.execute(
                 session_id,
@@ -220,6 +229,40 @@ class AssistantService:
                 events=[EventResponse.model_validate(event) for event in events],
             )
         raise ValueError(f"Unsupported action: {command.action}")
+
+    def _preflight_text(
+        self, session_id: str, text: str, source: str
+    ) -> AssistantResponse | None:
+        normalized = normalize_text(text)
+        parsed = parse_datetime_parts(text, self._now())
+        if parsed.invalid_date:
+            return AssistantResponse(
+                reply="Указанная дата не существует. Проверьте число, месяц и год.",
+                action=Action.CLARIFY.value,
+                transcript=text,
+                needs_clarification=True,
+            )
+        if any(marker in normalized for marker in ("каждый", "каждую", "еженед", "ежемесяч", "повторяющ")):
+            return AssistantResponse(
+                reply="Повторяющиеся задачи и встречи пока не поддерживаются.",
+                action=Action.CLARIFY.value,
+                transcript=text,
+            )
+        if "что свободно" in normalized or "свободн" in normalized and "врем" in normalized:
+            return AssistantResponse(
+                reply="Я пока не умею искать свободные интервалы, но могу показать запланированные события за нужный период.",
+                action=Action.CLARIFY.value,
+                transcript=text,
+            )
+        return None
+
+    @staticmethod
+    def _is_new_non_event_intent(value: str) -> bool:
+        text = normalize_text(value)
+        return (
+            text in {"привет", "здравствуй", "здравствуйте", "как ты", "что ты умеешь", "что умеешь"}
+            or text.startswith(("привет ", "здравствуй ", "что ты умеешь"))
+        )
 
     def _create_event_atomically(
         self,

@@ -75,7 +75,9 @@ def normalize_command(
             else Action.CREATE_TASK
         )
         updates.update({"action": action, "event_type": event_type})
-        updates["title"] = command.title or DEFAULT_TITLES[event_type]
+        title = (command.title or "").strip()
+        has_title = bool(title) and title != DEFAULT_TITLES[event_type]
+        updates["title"] = title or DEFAULT_TITLES[event_type]
 
         if now:
             parsed = parse_datetime_parts(source, now)
@@ -100,6 +102,8 @@ def normalize_command(
                     }
                 )
                 missing = []
+                if not has_title:
+                    missing.append("title")
                 if not date_value:
                     missing.append("start_date")
                 if not time_value:
@@ -123,6 +127,8 @@ def normalize_command(
                     }
                 )
                 missing = []
+                if not has_title:
+                    missing.append("title")
                 if not date_value:
                     missing.append("due_date")
                 if event_type == EventType.REMINDER and not time_value:
@@ -300,6 +306,12 @@ def clarification_question(event_type: EventType, missing: list[str]) -> str | N
         return "Указанная дата уже прошла. Укажите будущую дату."
     if "future_datetime" in missing:
         return "Указанные дата или время уже прошли. Укажите будущую дату или время."
+    if "title" in missing:
+        if event_type == EventType.MEETING:
+            return "С кем или о чем будет встреча?"
+        if event_type == EventType.REMINDER:
+            return "Что нужно напомнить?"
+        return "Что нужно сделать?"
     date_field = "start_date" if event_type == EventType.MEETING else "due_date"
     time_field = "start_time" if event_type == EventType.MEETING else "due_time"
     label = {

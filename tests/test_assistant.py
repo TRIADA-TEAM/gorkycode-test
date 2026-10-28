@@ -345,6 +345,32 @@ def test_pending_reminder_uses_original_time_answer(db):
     assert second.created_event.due_at == "2026-10-16T12:00:00+03:00"
 
 
+def test_greeting_clears_unfinished_creation(db):
+    session_id = str(uuid4())
+    client = ScriptedClient([
+        AssistantCommand(
+            action=Action.CLARIFY,
+            transcript="Привет",
+            clarification_question="Я помогаю с задачами и встречами.",
+        )
+    ])
+    assistant = AssistantService(db, Settings(), client, lambda: NOW)
+    pending = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Создай задачу",
+        title="Задача",
+        event_type=EventType.TASK,
+        missing_fields=["title", "due_date"],
+        clarification_question="Что нужно сделать?",
+    )
+    assistant.dialogue.set_pending(session_id, pending)
+
+    result = asyncio.run(assistant.handle_text(session_id, "Привет"))
+
+    assert result.action == Action.CLARIFY.value
+    assert assistant.dialogue.get_pending(session_id) is None
+
+
 def test_audio_is_transcribed_before_command_interpretation(db):
     session_id = str(uuid4())
     transcript = "Добавь задачу сходить в магазин завтра"
