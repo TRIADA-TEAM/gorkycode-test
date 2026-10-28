@@ -76,6 +76,15 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         moment = now + timedelta(hours=amount)
         return ParsedDateTime(moment.date(), moment.timetz().replace(tzinfo=None), True, True)
 
+    relative_minutes = re.search(
+        r"через\s+(\d+|" + "|".join(NUMBER_WORDS) + r")\s+минут", text
+    )
+    if relative_minutes:
+        raw_amount = relative_minutes.group(1)
+        amount = int(raw_amount) if raw_amount.isdigit() else NUMBER_WORDS[raw_amount]
+        moment = now + timedelta(minutes=amount)
+        return ParsedDateTime(moment.date(), moment.timetz().replace(tzinfo=None), True, True)
+
     numeric = re.search(r"\b(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})\b", text)
     if numeric:
         year = int(numeric.group(3))
@@ -158,6 +167,10 @@ def parse_period(value: str, now: datetime) -> ParsedPeriod:
     text = " ".join(value.lower().replace("ё", "е").split())
     today = now.date()
 
+    explicit_range = _parse_explicit_range(text, now)
+    if explicit_range.start is not None:
+        return explicit_range
+
     if "на следующий день" in text or "следующий день" in text:
         target = today + timedelta(days=1)
         return ParsedPeriod(target, target)
@@ -237,6 +250,49 @@ def _month_in_text(text: str) -> int | None:
         if re.search(rf"\b{stem}\w*\b", text):
             return month
     return None
+
+
+def _parse_explicit_range(text: str, now: datetime) -> ParsedPeriod:
+    month_pattern = (
+        r"январ\w*|феврал\w*|март\w*|апрел\w*|ма[йя]|июн\w*|июл\w*|"
+        r"август\w*|сентябр\w*|октябр\w*|ноябр\w*|декабр\w*"
+    )
+    month_range = re.search(
+        rf"с\s+(\d{{1,2}})\s+({month_pattern})\s+по\s+"
+        rf"(\d{{1,2}})\s+({month_pattern})(?:\s+(\d{{4}}))?",
+        text,
+    )
+    numeric_range = re.search(
+        r"с\s+(\d{1,2})[./-](\d{1,2})\s+по\s+"
+        r"(\d{1,2})[./-](\d{1,2})(?:[./-](\d{4}))?",
+        text,
+    )
+    try:
+        if month_range:
+            start_month = next(
+                number
+                for stem, number in MONTHS.items()
+                if month_range.group(2).startswith(stem)
+            )
+            end_month = next(
+                number
+                for stem, number in MONTHS.items()
+                if month_range.group(4).startswith(stem)
+            )
+            year = int(month_range.group(5) or now.year)
+            return ParsedPeriod(
+                date(year, start_month, int(month_range.group(1))),
+                date(year, end_month, int(month_range.group(3))),
+            )
+        if numeric_range:
+            year = int(numeric_range.group(5) or now.year)
+            return ParsedPeriod(
+                date(year, int(numeric_range.group(2)), int(numeric_range.group(1))),
+                date(year, int(numeric_range.group(4)), int(numeric_range.group(3))),
+            )
+    except ValueError:
+        return ParsedPeriod()
+    return ParsedPeriod()
 
 
 def combine(date_value: date, time_value: time, now: datetime) -> datetime:

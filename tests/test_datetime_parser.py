@@ -33,6 +33,13 @@ def test_time_words_are_parsed_in_clarification_replies():
     assert parse_datetime_parts("12 часов", NOW).time_value == time(12, 0)
 
 
+def test_relative_minutes_are_calculated():
+    result = parse_datetime_parts("через 30 минут", NOW)
+
+    assert result.date_value == date(2026, 10, 15)
+    assert result.time_value == time(12, 30)
+
+
 def test_invalid_calendar_date_is_reported():
     result = parse_datetime_parts("31.02.2026 в 12:00", NOW)
 
@@ -69,3 +76,12 @@ def test_winter_period_crosses_year_boundary():
 
     assert result.start == date(2026, 12, 1)
     assert result.end == date(2027, 2, 28)
+
+
+def test_explicit_date_range_includes_both_boundaries():
+    result = parse_period(
+        "Что у меня с 29 октября по 31 октября 2026?", NOW
+    )
+
+    assert result.start == date(2026, 10, 29)
+    assert result.end == date(2026, 10, 31)

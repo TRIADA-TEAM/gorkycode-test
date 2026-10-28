@@ -44,7 +44,8 @@ def normalize_command(
         )
     updates: dict = {}
 
-    explicit_type = detect_event_type(command.transcript)
+    source = source_text or command.transcript
+    explicit_type = detect_event_type(source)
     if command.action in {Action.CREATE_TASK, Action.CREATE_MEETING} or (
         command.action == Action.CLARIFY and explicit_type is not None
     ):
@@ -64,7 +65,7 @@ def normalize_command(
         updates["title"] = command.title or DEFAULT_TITLES[event_type]
 
         if now:
-            parsed = parse_datetime_parts(command.transcript, now)
+            parsed = parse_datetime_parts(source, now)
             if action == Action.CREATE_MEETING:
                 date_value = parsed.date_value
                 time_value = parsed.time_value

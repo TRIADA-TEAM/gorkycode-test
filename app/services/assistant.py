@@ -655,9 +655,12 @@ class AssistantService:
             else Action.CREATE_TASK
         )
         current_default = DEFAULT_TITLES.get(current.event_type)
+        has_context_value = parsed.has_explicit_date or parsed.has_explicit_time
         title = (
             current.title
-            if current.title and current.title != current_default
+            if current.title
+            and current.title != current_default
+            and not has_context_value
             else pending.title or DEFAULT_TITLES[event_type]
         )
 

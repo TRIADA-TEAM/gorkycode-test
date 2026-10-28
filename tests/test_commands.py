@@ -213,6 +213,26 @@ def test_generic_period_uses_original_text_and_keeps_all_event_types():
     assert result.date_to == datetime.fromisoformat("2026-11-08T23:59:59+03:00")
 
 
+def test_original_reminder_intent_wins_over_provider_task_type():
+    command = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Перефразированный ответ модели",
+        title="Размяться",
+        event_type=EventType.TASK,
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Напомни размяться через два часа",
+    )
+
+    assert result.action == Action.CREATE_TASK
+    assert result.event_type == EventType.REMINDER
+    assert result.due_at == datetime.fromisoformat("2026-10-15T14:00:00+03:00")
+    assert result.missing_fields == []
+
+
 def test_generic_planned_events_start_from_current_moment():
     command = AssistantCommand(
         action=Action.LIST_EVENTS,
