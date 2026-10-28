@@ -84,24 +84,21 @@ class EventService:
         event_moment = func.coalesce(moment, fallback_moment, date_only)
         event_date = func.substr(event_moment, 1, 10)
         if date_from:
-            if date_from.time() == datetime.min.time():
-                conditions.append(event_date >= date_from.date().isoformat())
-            else:
-                conditions.append(event_moment >= iso(date_from))
+            conditions.append(event_date >= date_from.date().isoformat())
         if date_to:
-            if date_to.time().replace(microsecond=0) == datetime.max.time().replace(
-                microsecond=0
-            ):
-                conditions.append(event_date <= date_to.date().isoformat())
-            else:
-                conditions.append(event_moment <= iso(date_to))
+            conditions.append(event_date <= date_to.date().isoformat())
         stmt = (
             select(Event)
             .where(and_(*conditions))
             .order_by(event_moment.asc().nullslast(), Event.id)
             .limit(limit)
         )
-        return list(self.db.scalars(stmt))
+        events = list(self.db.scalars(stmt))
+        if date_from and date_from.time() != datetime.min.time():
+            events = [event for event in events if _matches_time_bound(event, date_from, lower=True)]
+        if date_to and date_to.time().replace(microsecond=0) != datetime.max.time().replace(microsecond=0):
+            events = [event for event in events if _matches_time_bound(event, date_to, lower=False)]
+        return events
 
     def search_events(
         self,
@@ -270,6 +267,16 @@ class EventService:
             self.db.flush()
         self.db.refresh(event)
         return event
+
+
+def _matches_time_bound(event: Event, bound: datetime, *, lower: bool) -> bool:
+    value = event.starts_at or event.due_at
+    if not value:
+        return True
+    moment = datetime.fromisoformat(value)
+    if moment.date() != bound.date():
+        return True
+    return moment >= bound if lower else moment <= bound
 
 
 class DialogueService:

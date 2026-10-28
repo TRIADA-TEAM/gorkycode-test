@@ -85,6 +85,10 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         moment = now + timedelta(minutes=amount)
         return ParsedDateTime(moment.date(), moment.timetz().replace(tzinfo=None), True, True)
 
+    if "до конца недели" in text:
+        target = now.date() + timedelta(days=6 - now.weekday())
+        return ParsedDateTime(target, None, True, False)
+
     numeric = re.search(r"\b(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})\b", text)
     if numeric:
         year = int(numeric.group(3))

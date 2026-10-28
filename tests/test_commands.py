@@ -213,6 +213,22 @@ def test_generic_period_uses_original_text_and_keeps_all_event_types():
     assert result.date_to == datetime.fromisoformat("2026-11-08T23:59:59+03:00")
 
 
+def test_morning_period_limits_time_range():
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript="Какие планы на завтра утром?",
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-28T12:00:00+03:00"),
+        source_text="Какие планы на завтра утром?",
+    )
+
+    assert result.date_from == datetime.fromisoformat("2026-10-29T06:00:00+03:00")
+    assert result.date_to == datetime.fromisoformat("2026-10-29T12:00:00+03:00")
+
+
 def test_original_reminder_intent_wins_over_provider_task_type():
     command = AssistantCommand(
         action=Action.CREATE_TASK,

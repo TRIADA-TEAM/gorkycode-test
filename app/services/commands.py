@@ -232,7 +232,7 @@ def _has_event_query_intent(text: str) -> bool:
     if _is_list_request(text):
         return True
     event_words = ("событ", "задач", "дело", "дела", "напомин", "встреч", "план")
-    query_words = ("найди", "найти", "поиск", "покажи", "когда", "есть ли", "что у меня")
+    query_words = ("найди", "найти", "поиск", "покажи", "когда", "сколько", "есть ли", "что у меня")
     return any(word in text for word in event_words) and any(
         word in text for word in query_words
     )
@@ -241,7 +241,10 @@ def _has_event_query_intent(text: str) -> bool:
 def _is_search_request(text: str) -> bool:
     explicit_search = text.startswith(("найди ", "найти ", "поищи ", "поиск "))
     temporal_search = bool(
-        re.search(r"\bкогда\s+(?:был[аои]?|будет|будут|прошл[аои]?|предстоит)\b", text)
+        re.search(
+            r"\b(?:когда|во сколько)\s+(?:был[аои]?|будет|будут|прошл[аои]?|предстоит|у меня)\b",
+            text,
+        )
     )
     return explicit_search or temporal_search
 
@@ -301,13 +304,15 @@ def _is_past(
 
 def _relative_period(text_value: str, now: datetime) -> dict:
     exact = parse_datetime_parts(text_value, now)
-    if exact.date_value and not exact.invalid_date:
+    if (
+        exact.date_value
+        and not exact.invalid_date
+        and not re.search(r"\bс\b.*\bпо\b", normalize_text(text_value))
+    ):
         tz = now.tzinfo
         return {
-            "date_from": datetime.combine(exact.date_value, time.min, tzinfo=tz),
-            "date_to": datetime.combine(
-                exact.date_value, time(23, 59, 59), tzinfo=tz
-            ),
+            "date_from": _period_bound(exact.date_value, text_value, now, lower=True),
+            "date_to": _period_bound(exact.date_value, text_value, now, lower=False),
         }
     parsed = parse_period(text_value, now)
     if parsed.start is None:
@@ -321,6 +326,24 @@ def _relative_period(text_value: str, now: datetime) -> dict:
         return {"date_from": None, "date_to": None}
     tz = now.tzinfo
     return {
-        "date_from": datetime.combine(parsed.start, time.min, tzinfo=tz),
-        "date_to": datetime.combine(parsed.end, time(23, 59, 59), tzinfo=tz),
+        "date_from": _period_bound(parsed.start, text_value, now, lower=True),
+        "date_to": _period_bound(parsed.end, text_value, now, lower=False),
     }
+
+
+def _period_bound(day, text_value: str, now: datetime, *, lower: bool) -> datetime:
+    text = normalize_text(text_value)
+    ranges = {
+        "утр": (time(6), time(12)),
+        "днем": (time(12), time(18)),
+        "вечер": (time(18), time(23, 59, 59)),
+        "ночью": (time.min, time(6)),
+    }
+    words = text.split()
+    selected = next(
+        (value for marker, value in ranges.items() if any(word.startswith(marker) for word in words)),
+        None,
+    )
+    if not selected:
+        return datetime.combine(day, time.min if lower else time(23, 59, 59), tzinfo=now.tzinfo)
+    return datetime.combine(day, selected[0 if lower else 1], tzinfo=now.tzinfo)
