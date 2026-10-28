@@ -167,12 +167,13 @@ def normalize_command(
             requested_types.append(EventType.TASK)
         elif "встреч" in text and "без задач" in text:
             requested_types.append(EventType.MEETING)
-        elif "встреч" in text:
-            requested_types.append(EventType.MEETING)
-        if "задач" in text or any(word.startswith("дел") for word in text.split()):
-            requested_types.append(EventType.TASK)
-        if "напомин" in text:
-            requested_types.append(EventType.REMINDER)
+        else:
+            if "встреч" in text:
+                requested_types.append(EventType.MEETING)
+            if "задач" in text or any(word.startswith("дел") for word in text.split()):
+                requested_types.append(EventType.TASK)
+            if "напомин" in text:
+                requested_types.append(EventType.REMINDER)
         if len(requested_types) == 1:
             updates["event_type"] = requested_types[0]
             updates["event_types"] = []

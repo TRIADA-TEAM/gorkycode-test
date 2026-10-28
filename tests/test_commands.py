@@ -337,6 +337,22 @@ def test_after_lunch_period_has_time_bounds():
     assert result.date_to == datetime.fromisoformat("2026-10-15T23:59:59+03:00")
 
 
+def test_meetings_without_tasks_keeps_only_meeting_type():
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript="Покажи встречи без задач",
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Покажи встречи без задач",
+    )
+
+    assert result.event_type == EventType.MEETING
+    assert result.event_types == []
+
+
 def test_between_hours_period_has_time_bounds():
     command = AssistantCommand(action=Action.LIST_EVENTS, transcript="Что у меня между 10 и 12?")
 
