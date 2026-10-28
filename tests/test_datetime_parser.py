@@ -86,3 +86,10 @@ def test_explicit_date_range_includes_both_boundaries():
 
     assert result.start == date(2026, 10, 29)
     assert result.end == date(2026, 10, 31)
+
+
+def test_iso_date_is_parsed():
+    result = parse_datetime_parts("2026-11-03 в 10:00", NOW)
+
+    assert result.date_value == date(2026, 11, 3)
+    assert result.time_value == time(10, 0)

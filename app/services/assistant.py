@@ -234,6 +234,14 @@ class AssistantService:
         self, session_id: str, text: str, source: str
     ) -> AssistantResponse | None:
         normalized = normalize_text(text)
+        if normalized.startswith(("удали ", "удалить ")) and any(
+            word in normalized.split() for word in ("все", "всё")
+        ):
+            return AssistantResponse(
+                reply="Массовое удаление пока не поддерживается. Укажите конкретное событие.",
+                action=Action.CLARIFY.value,
+                transcript=text,
+            )
         parsed = parse_datetime_parts(text, self._now())
         if parsed.invalid_date:
             return AssistantResponse(

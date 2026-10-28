@@ -324,6 +324,32 @@ def test_past_meeting_question_is_detected_as_search():
     assert result.query == "дизайнером"
 
 
+def test_after_lunch_period_has_time_bounds():
+    command = AssistantCommand(action=Action.LIST_EVENTS, transcript="Какие планы после обеда?")
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Какие планы после обеда?",
+    )
+
+    assert result.date_from == datetime.fromisoformat("2026-10-15T14:00:00+03:00")
+    assert result.date_to == datetime.fromisoformat("2026-10-15T23:59:59+03:00")
+
+
+def test_between_hours_period_has_time_bounds():
+    command = AssistantCommand(action=Action.LIST_EVENTS, transcript="Что у меня между 10 и 12?")
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Что у меня между 10 и 12?",
+    )
+
+    assert result.date_from == datetime.fromisoformat("2026-10-15T10:00:00+03:00")
+    assert result.date_to == datetime.fromisoformat("2026-10-15T12:00:00+03:00")
+
+
 def test_generic_planned_events_start_from_current_moment():
     command = AssistantCommand(
         action=Action.LIST_EVENTS,

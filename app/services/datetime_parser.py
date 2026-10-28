@@ -91,8 +91,19 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         target = now.date() + timedelta(days=6 - now.weekday())
         return ParsedDateTime(target, None, True, False)
 
+    iso_numeric = re.search(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b", text)
+    if iso_numeric:
+        try:
+            date_value = date(
+                int(iso_numeric.group(1)),
+                int(iso_numeric.group(2)),
+                int(iso_numeric.group(3)),
+            )
+        except ValueError:
+            invalid_date = True
+        date_span = iso_numeric.span()
     numeric = re.search(r"\b(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})\b", text)
-    if numeric:
+    if not iso_numeric and numeric:
         year = int(numeric.group(3))
         if year < 100:
             year += 2000
@@ -101,7 +112,7 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         except ValueError:
             invalid_date = True
         date_span = numeric.span()
-    else:
+    elif not iso_numeric:
         month_date = re.search(
             r"\b(\d{1,2})\s+"
             r"(январ\w*|феврал\w*|март\w*|апрел\w*|ма[йя]|июн\w*|июл\w*|"

@@ -163,7 +163,11 @@ def normalize_command(
     if command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS}:
         text = normalize_text(source_text or command.transcript)
         requested_types = []
-        if "встреч" in text:
+        if "задач" in text and "без встреч" in text:
+            requested_types.append(EventType.TASK)
+        elif "встреч" in text and "без задач" in text:
+            requested_types.append(EventType.MEETING)
+        elif "встреч" in text:
             requested_types.append(EventType.MEETING)
         if "задач" in text or any(word.startswith("дел") for word in text.split()):
             requested_types.append(EventType.TASK)
@@ -245,6 +249,7 @@ def _is_list_request(text: str) -> bool:
         "покажи задачи",
         "покажи встречи",
         "есть ли события",
+        "есть что-нибудь", "есть что нибудь", "есть ли что",
         "мои планы",
     )
     plural_list = bool(
@@ -349,6 +354,32 @@ def _is_past(
 
 
 def _relative_period(text_value: str, now: datetime) -> dict:
+    text = normalize_text(text_value)
+    time_range = re.search(
+        r"(?:между\s+|с\s+)(\d{1,2})(?::(\d{2}))?\s+(?:и|до)\s+"
+        r"(\d{1,2})(?::(\d{2}))?",
+        text,
+    )
+    after = re.search(r"(?:после|позже)\s+(\d{1,2})(?::(\d{2}))?", text)
+    before = re.search(r"(?:до|раньше)\s+(\d{1,2})(?::(\d{2}))?", text)
+    if time_range or after or before or "после обеда" in text:
+        exact_for_day = parse_datetime_parts(text_value, now)
+        day = exact_for_day.date_value or now.date()
+        if time_range:
+            start = time(int(time_range.group(1)), int(time_range.group(2) or 0))
+            end = time(int(time_range.group(3)), int(time_range.group(4) or 0))
+        elif after:
+            start = time(int(after.group(1)), int(after.group(2) or 0))
+            end = time(23, 59, 59)
+        elif before:
+            start = time.min
+            end = time(int(before.group(1)), int(before.group(2) or 0))
+        else:
+            start, end = time(14), time(23, 59, 59)
+        return {
+            "date_from": datetime.combine(day, start, tzinfo=now.tzinfo),
+            "date_to": datetime.combine(day, end, tzinfo=now.tzinfo),
+        }
     exact = parse_datetime_parts(text_value, now)
     if (
         exact.date_value
