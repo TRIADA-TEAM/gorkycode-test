@@ -288,6 +288,24 @@ def test_task_without_title_asks_for_content_before_date():
     assert result.clarification_question == "Что нужно сделать?"
 
 
+def test_explicit_without_title_overrides_model_title():
+    command = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Ответ модели",
+        title="RETEST-04",
+        event_type=EventType.TASK,
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Создай задачу RETEST-04 без названия",
+    )
+
+    assert result.missing_fields == ["title", "due_date"]
+    assert result.clarification_question == "Что нужно сделать?"
+
+
 def test_past_meeting_question_is_detected_as_search():
     command = AssistantCommand(
         action=Action.CLARIFY,

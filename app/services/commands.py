@@ -76,7 +76,15 @@ def normalize_command(
         )
         updates.update({"action": action, "event_type": event_type})
         title = (command.title or "").strip()
-        has_title = bool(title) and title != DEFAULT_TITLES[event_type]
+        explicit_missing_title = any(
+            marker in normalize_text(source)
+            for marker in ("без названия", "без содержания", "без описания")
+        )
+        has_title = (
+            bool(title)
+            and title != DEFAULT_TITLES[event_type]
+            and not explicit_missing_title
+        )
         updates["title"] = title or DEFAULT_TITLES[event_type]
 
         if now:
