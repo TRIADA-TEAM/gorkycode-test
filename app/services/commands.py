@@ -183,7 +183,7 @@ def normalize_command(
         else:
             updates["event_type"] = None
             updates["event_types"] = []
-        if "выполнен" in text or "сделан" in text:
+        if any(marker in text for marker in ("выполнен", "завершен", "завершен", "сделан", "готов")):
             updates["statuses"] = [EventStatus.COMPLETED]
         elif "невыполн" in text or "незаверш" in text:
             updates["statuses"] = [EventStatus.PENDING]
@@ -283,6 +283,9 @@ def _is_search_request(text: str) -> bool:
         ("когда" in text or "во сколько" in text)
         and any(word in text for word in ("встреч", "созвон", "совещан", "задач", "напомин"))
     )
+    conversational_meeting_search = any(
+        phrase in text for phrase in ("что за встреч", "расскажи про встреч", "что это за встреч")
+    )
     temporal_search = bool(
         re.search(
             r"\b(?:когда|во сколько)(?:\s+у\s+меня)?\s+"
@@ -290,7 +293,7 @@ def _is_search_request(text: str) -> bool:
             text,
         )
     )
-    return explicit_search or natural_event_search or temporal_search
+    return explicit_search or natural_event_search or conversational_meeting_search or temporal_search
 
 
 def _temporal_direction(text: str) -> str | None:

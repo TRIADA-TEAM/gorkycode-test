@@ -353,6 +353,23 @@ def test_meetings_without_tasks_keeps_only_meeting_type():
     assert result.event_types == []
 
 
+def test_conversational_meeting_question_is_search():
+    command = AssistantCommand(
+        action=Action.CLARIFY,
+        transcript="Ответ модели",
+        clarification_question="Уточните запрос",
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Что за встреча с Олей?",
+    )
+
+    assert result.action == Action.SEARCH_EVENTS
+    assert result.event_type == EventType.MEETING
+
+
 def test_between_hours_period_has_time_bounds():
     command = AssistantCommand(action=Action.LIST_EVENTS, transcript="Что у меня между 10 и 12?")
 

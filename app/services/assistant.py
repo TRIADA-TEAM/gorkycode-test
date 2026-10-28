@@ -28,7 +28,7 @@ from app.services.commands import (
 )
 from app.services.datetime_parser import combine, parse_datetime_parts
 from app.services.events import DialogueService, EventService
-from app.services.text import normalize_text
+from app.services.text import extract_target_query, normalize_text
 
 
 logger = logging.getLogger(__name__)
@@ -436,7 +436,9 @@ class AssistantService:
             event = self.events.get_owned(session_id, event_id) if event_id else None
             candidates = [event] if event and event.status != EventStatus.CANCELLED.value else []
         else:
-            query = command.target_query or command.query or command.title or ""
+            query = extract_target_query(
+                command.target_query or command.query or command.title or ""
+            )
             if command.target_query:
                 candidates = self._search_target_candidates(session_id, command)
             else:
@@ -456,7 +458,7 @@ class AssistantService:
         return candidates
 
     def _search_target_candidates(self, session_id: str, command: AssistantCommand):
-        query = command.target_query or ""
+        query = extract_target_query(command.target_query or "")
         matching = self.events.search_events(
             session_id, query, event_type=command.event_type, limit=5
         )
