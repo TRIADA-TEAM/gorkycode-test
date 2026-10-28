@@ -188,6 +188,7 @@ class AssistantService:
                 command.date_to,
                 command.event_type,
                 event_types=command.event_types,
+                statuses=set(command.statuses) if command.statuses else None,
             )
             self.dialogue.clear_pending(session_id)
             if len(events) == 1:
@@ -420,9 +421,11 @@ class AssistantService:
     def _apply_event_update(self, event, command: AssistantCommand):
         parsed = parse_datetime_parts(command.transcript, self._now())
         title = command.new_title
-        if title is None and not parsed.has_explicit_date and not parsed.has_explicit_time:
+        if title is None and not command.clear_time and not parsed.has_explicit_date and not parsed.has_explicit_time:
             raise ValueError("Укажите новое название, дату или время события")
         if event.type == EventType.MEETING.value:
+            if command.clear_time:
+                raise ValueError("Для встречи время обязательно")
             current_start = datetime.fromisoformat(event.starts_at)
             date_value = parsed.date_value if parsed.has_explicit_date else current_start.date()
             time_value = parsed.time_value if parsed.has_explicit_time else current_start.time()
@@ -453,7 +456,7 @@ class AssistantService:
                 commit=False,
             )
 
-        if not parsed.has_explicit_date and not parsed.has_explicit_time:
+        if not command.clear_time and not parsed.has_explicit_date and not parsed.has_explicit_time:
             return self.events.update_event(
                 event,
                 title=title,
@@ -471,7 +474,7 @@ class AssistantService:
             datetime.fromisoformat(event.due_at).time() if event.due_at else None
         )
         date_value = parsed.date_value if parsed.has_explicit_date else current_date
-        time_value = parsed.time_value if parsed.has_explicit_time else current_time
+        time_value = None if command.clear_time else parsed.time_value if parsed.has_explicit_time else current_time
         due_at = combine(date_value, time_value, self._now()) if time_value else None
         if (due_at and due_at <= self._now()) or (
             not due_at and date_value < self._now().date()
@@ -488,9 +491,10 @@ class AssistantService:
 
     @staticmethod
     def _is_cancel_request(value: str) -> bool:
-        return normalize_text(value) in {
-            "отмена", "не надо", "забудь", "начнем заново", "ничего не создавай"
-        }
+        text = normalize_text(value)
+        return text in {"отмена", "не надо", "забудь", "начнем заново", "ничего не создавай"} or (
+            text.startswith("нет") and any(word in text for word in ("отмен", "добав", "создан"))
+        )
 
     @classmethod
     def _should_cancel_pending(cls, value: str, pending: dict) -> bool:
@@ -498,7 +502,7 @@ class AssistantService:
             return True
         return (
             "conflict_confirmation" in pending.get("missing_fields", [])
-            and normalize_text(value) in {"нет", "не продолжай", "не добавляй"}
+            and AssistantService._is_negative(value)
         )
 
     @staticmethod
@@ -519,9 +523,17 @@ class AssistantService:
 
     @staticmethod
     def _is_affirmative(value: str) -> bool:
-        return normalize_text(value) in {
-            "да", "да все равно", "все равно", "подтверждаю", "добавь все равно"
-        }
+        text = normalize_text(value)
+        return text in {"да", "все равно", "подтверждаю", "добавь все равно"} or (
+            text.startswith("да") and any(word in text for word in ("продолж", "добав", "созда"))
+        )
+
+    @staticmethod
+    def _is_negative(value: str) -> bool:
+        text = normalize_text(value)
+        return text in {"нет", "не продолжай", "не добавляй"} or (
+            text.startswith("нет") and any(word in text for word in ("отмен", "добав", "создан"))
+        )
 
     def _conflict_response(self, session_id, command, conflicts) -> AssistantResponse:
         pending = command.model_copy(
@@ -573,7 +585,7 @@ class AssistantService:
                     Action.COMPLETE_EVENT,
                 }:
                     normalized = self._merge_management_pending(
-                        command, pending_command
+                        command, pending_command, source_text=source_text
                     )
                 else:
                     normalized = self._merge_pending(
@@ -605,7 +617,9 @@ class AssistantService:
 
     @staticmethod
     def _merge_management_pending(
-        current: AssistantCommand, pending: AssistantCommand
+        current: AssistantCommand,
+        pending: AssistantCommand,
+        source_text: str | None = None,
     ) -> AssistantCommand:
         target_event_id = current.target_event_id or pending.target_event_id
         number = re.fullmatch(r"\s*(\d+)\s*[.!]?\s*", current.transcript)
@@ -631,7 +645,7 @@ class AssistantService:
                 "new_title": current.new_title or pending.new_title,
                 "conflict_confirmed": (
                     pending.conflict_confirmed
-                    or AssistantService._is_affirmative(current.transcript)
+                    or AssistantService._is_affirmative(source_text or current.transcript)
                 ),
                 "missing_fields": [],
                 "clarification_question": None,

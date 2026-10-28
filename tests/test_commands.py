@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.domain.commands import Action, AssistantCommand, EventType
+from app.domain.commands import Action, AssistantCommand, EventStatus, EventType
 from app.services.commands import normalize_command
 
 
@@ -247,6 +247,31 @@ def test_original_reminder_intent_wins_over_provider_task_type():
     assert result.event_type == EventType.REMINDER
     assert result.due_at == datetime.fromisoformat("2026-10-15T14:00:00+03:00")
     assert result.missing_fields == []
+
+
+def test_completed_task_list_requests_completed_status():
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript="Покажи выполненные задачи",
+    )
+
+    result = normalize_command(command, datetime.fromisoformat("2026-10-15T12:00:00+03:00"))
+
+    assert result.statuses == [EventStatus.COMPLETED]
+
+
+def test_invalid_clock_time_requires_correction():
+    command = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Создай задачу проверить принтер завтра в 25:61",
+        title="Проверить принтер",
+        event_type=EventType.TASK,
+    )
+
+    result = normalize_command(command, datetime.fromisoformat("2026-10-15T12:00:00+03:00"))
+
+    assert result.missing_fields == ["invalid_time"]
+    assert "некорректно" in result.clarification_question
 
 
 def test_generic_planned_events_start_from_current_moment():

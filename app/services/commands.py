@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, time, timedelta
 
-from app.domain.commands import Action, AssistantCommand, EventType
+from app.domain.commands import Action, AssistantCommand, EventStatus, EventType
 from app.services.datetime_parser import ParsedPeriod, combine, parse_datetime_parts, parse_period
 from app.services.text import extract_search_query, normalize_text
 
@@ -22,6 +22,19 @@ def normalize_command(
 ) -> AssistantCommand:
     """Map occasionally inconsistent model fields to application semantics."""
     transcript_text = normalize_text(source_text or command.transcript)
+    if (
+        command.action in {Action.CREATE_TASK, Action.CREATE_MEETING}
+        and " и " in f" {transcript_text} "
+        and "встреч" in transcript_text
+        and ("задач" in transcript_text or "напомин" in transcript_text)
+    ):
+        return command.model_copy(
+            update={
+                "action": Action.CLARIFY,
+                "missing_fields": [],
+                "clarification_question": "Я обрабатываю одну команду за раз. Уточните, какое действие выполнить первым.",
+            }
+        )
     if _is_search_request(transcript_text):
         command = command.model_copy(update={"action": Action.SEARCH_EVENTS})
     if _is_list_request(transcript_text):
@@ -118,6 +131,8 @@ def normalize_command(
             if parsed.invalid_date:
                 missing = [field for field in missing if not field.endswith("_date")]
                 missing.insert(0, "invalid_date")
+            elif parsed.invalid_time:
+                missing.insert(0, "invalid_time")
             elif date_value and date_value < now.date():
                 # A date that has already passed is invalid regardless of whether
                 # another required field (for example meeting time) is missing.
@@ -149,6 +164,10 @@ def normalize_command(
         else:
             updates["event_type"] = None
             updates["event_types"] = []
+        if "выполнен" in text or "сделан" in text:
+            updates["statuses"] = [EventStatus.COMPLETED]
+        elif "невыполн" in text or "незаверш" in text:
+            updates["statuses"] = [EventStatus.PENDING]
         updates["starts_at"] = None
         updates["ends_at"] = None
         updates["due_at"] = None
@@ -270,6 +289,8 @@ def clarification_question(event_type: EventType, missing: list[str]) -> str | N
         return None
     if "invalid_date" in missing:
         return "Не удалось распознать дату. Укажите её, например: «15 октября» или «15.10.2026»."
+    if "invalid_time" in missing:
+        return "Время указано некорректно. Используйте формат вроде «15:30»."
     if "past_date" in missing:
         return "Указанная дата уже прошла. Укажите будущую дату."
     if "future_datetime" in missing:

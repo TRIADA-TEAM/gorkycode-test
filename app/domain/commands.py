@@ -36,6 +36,7 @@ class AssistantCommand(BaseModel):
     title: str | None = Field(default=None, max_length=500)
     event_type: EventType | None = None
     event_types: list[EventType] = Field(default_factory=list)
+    statuses: list[EventStatus] = Field(default_factory=list)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     due_at: datetime | None = None
@@ -48,6 +49,7 @@ class AssistantCommand(BaseModel):
     new_title: str | None = Field(default=None, max_length=500)
     candidate_event_ids: list[int] = Field(default_factory=list)
     conflict_confirmed: bool = False
+    clear_time: bool = False
     missing_fields: list[str] = Field(default_factory=list)
     clarification_question: str | None = Field(default=None, max_length=500)
 
@@ -73,6 +75,7 @@ class EventEditRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     event_date: date | None = None
     event_time: time | None = None
+    clear_time: bool = False
 
     @field_validator("title")
     @classmethod

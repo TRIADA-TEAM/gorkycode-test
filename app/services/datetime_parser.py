@@ -50,6 +50,7 @@ class ParsedDateTime:
     has_explicit_date: bool = False
     has_explicit_time: bool = False
     invalid_date: bool = False
+    invalid_time: bool = False
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,7 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
     date_value = None
     time_value = None
     invalid_date = False
+    invalid_time = False
     date_span: tuple[int, int] | None = None
 
     relative_hours = re.search(
@@ -143,6 +145,7 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
     if clock:
         time_value = time(int(clock.group(1)), int(clock.group(2)))
     else:
+        invalid_time = bool(re.search(r"\b\d{1,2}:\d{2}\b", time_text))
         hour = re.search(
             r"(?:\bв\s+|^|\s)([01]?\d|2[0-3])(?:\s+час(?:а|ов)?)?\s*(утра|дня|вечера)?\b",
             time_text,
@@ -163,6 +166,7 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         has_explicit_date=date_value is not None or invalid_date,
         has_explicit_time=time_value is not None,
         invalid_date=invalid_date,
+        invalid_time=invalid_time,
     )
 
 

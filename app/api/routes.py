@@ -139,6 +139,7 @@ async def edit_event(
             event_type=EventType(item.type),
             target_event_id=event_id,
             new_title=body.title,
+            clear_time=body.clear_time,
         ),
         "user_text",
     )

@@ -536,3 +536,56 @@ def test_update_without_new_values_asks_what_to_change(db):
     assert assistant.dialogue.get_pending(session_id)["missing_fields"] == [
         "update_details"
     ]
+
+
+def test_expanded_conflict_confirmation_is_accepted(db):
+    session_id = str(uuid4())
+    assistant = service(db, [
+        AssistantCommand(
+            action=Action.CLARIFY,
+            transcript="Да, продолжить",
+            clarification_question="Подтвердите действие.",
+        )
+    ])
+    assistant.execute(session_id, meeting_command("Первая встреча", 20, 15), "user_text")
+    conflict = assistant.execute(
+        session_id, meeting_command("Вторая встреча", 20, 15), "user_text"
+    )
+
+    result = asyncio.run(assistant.handle_text(session_id, "Да, продолжить"))
+
+    assert conflict.needs_clarification is True
+    assert result.needs_clarification is False
+    assert result.created_event.title == "Вторая встреча"
+
+
+def test_clearing_task_time_removes_due_at(db):
+    session_id = str(uuid4())
+    assistant = service(db)
+    created = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Добавь задачу проверить датчик завтра в 00:00",
+            title="Проверить датчик",
+            event_type=EventType.TASK,
+            due_date=datetime.fromisoformat("2026-10-16").date(),
+            due_at=datetime.fromisoformat("2026-10-16T00:00:00+03:00"),
+        ),
+        "user_text",
+    ).created_event
+
+    result = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.UPDATE_EVENT,
+            transcript="Измени событие",
+            target_event_id=created.id,
+            new_title="Проверить датчик",
+            clear_time=True,
+        ),
+        "user_text",
+    )
+
+    assert result.created_event.due_date == "2026-10-16"
+    assert result.created_event.due_at is None

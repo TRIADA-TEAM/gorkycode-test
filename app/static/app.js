@@ -238,6 +238,7 @@ function showEventEditor(card, event) {
     const body = {title: normalizedTitle};
     if (date.input.value) body.event_date = date.input.value;
     if (time.input.value) body.event_time = time.input.value;
+    if (!time.input.value && (event.due_at || event.starts_at)) body.clear_time = true;
     await runEventAction(card, `/api/events/${event.id}`, {
       method: "PATCH",
       headers: {"Content-Type": "application/json"},

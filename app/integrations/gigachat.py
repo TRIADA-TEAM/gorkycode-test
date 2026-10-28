@@ -33,6 +33,10 @@ COMMAND_SCHEMA: dict[str, Any] = {
             "type": "array",
             "items": {"type": "string", "enum": ["task", "reminder", "meeting"]},
         },
+        "statuses": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["pending", "completed", "cancelled"]},
+        },
         "starts_at": {"type": ["string", "null"], "format": "date-time"},
         "ends_at": {"type": ["string", "null"], "format": "date-time"},
         "due_at": {"type": ["string", "null"], "format": "date-time"},
@@ -49,7 +53,7 @@ COMMAND_SCHEMA: dict[str, Any] = {
         "clarification_question": {"type": ["string", "null"]},
     },
     "required": [
-        "action", "transcript", "title", "event_type", "event_types", "starts_at", "ends_at",
+        "action", "transcript", "title", "event_type", "event_types", "statuses", "starts_at", "ends_at",
         "due_at", "date_from", "date_to", "query", "missing_fields",
         "clarification_question", "due_date", "target_event_id", "target_query",
         "new_title", "candidate_event_ids", "conflict_confirmed",
