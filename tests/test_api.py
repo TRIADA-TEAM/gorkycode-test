@@ -42,6 +42,18 @@ def test_desktop_split_layout_assets_are_served():
     assert "grid-template-columns" in desktop.text
 
 
+def test_html_and_assets_disable_stale_browser_cache():
+    with TestClient(app) as client:
+        page = client.get("/")
+        script = client.get("/static/app.js")
+
+    assert "__STATIC_VERSION__" not in page.text
+    assert "/static/app.js?v=" in page.text
+    assert "/static/styles.css?v=" in page.text
+    assert page.headers["cache-control"] == "no-store, max-age=0"
+    assert script.headers["cache-control"] == "no-store, max-age=0"
+
+
 def test_mobile_chat_collapse_assets_are_served():
     with TestClient(app) as client:
         script = client.get("/static/app.js")

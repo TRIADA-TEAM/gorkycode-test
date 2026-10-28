@@ -57,6 +57,9 @@ Out of scope for the first version:
 - The browser keeps up to 60 recent user/assistant messages per anonymous
   session in `localStorage` and restores them after reload. Event updates,
   completion, and deletion also update or remove stored event cards.
+- The index injects a content-derived version into the main JS/CSS URLs, and
+  prototype HTML/static responses use `Cache-Control: no-store`. This prevents
+  stale frontend code after deployment while the prototype is under review.
 - Time zone: `Europe/Moscow` until the product rules are revisited.
 - No seed dataset or seed import is used. Tests create their own isolated data.
 
