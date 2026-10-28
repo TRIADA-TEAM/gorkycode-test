@@ -376,12 +376,7 @@ class AssistantService:
                 Action.DELETE_EVENT,
                 Action.COMPLETE_EVENT,
             } and command.target_query:
-                matching = self.events.search_events(
-                    session_id,
-                    command.target_query,
-                    event_type=command.event_type,
-                    limit=5,
-                )
+                matching = self._search_target_candidates(session_id, command)
                 matching_ids = {event.id for event in matching}
                 if matching_ids:
                     candidates = [event for event in candidates if event.id in matching_ids]
@@ -391,9 +386,12 @@ class AssistantService:
             candidates = [event] if event and event.status != EventStatus.CANCELLED.value else []
         else:
             query = command.target_query or command.query or command.title or ""
-            candidates = self.events.search_events(
-                session_id, query, event_type=command.event_type, limit=5
-            )
+            if command.target_query:
+                candidates = self._search_target_candidates(session_id, command)
+            else:
+                candidates = self.events.search_events(
+                    session_id, query, event_type=command.event_type, limit=5
+                )
         # A date in a delete/complete request identifies the target event; do not
         # force the user to choose a number between same-named events on other dates.
         if command.action in {Action.DELETE_EVENT, Action.COMPLETE_EVENT}:
@@ -405,6 +403,26 @@ class AssistantService:
                     if self._event_matches_datetime(event, parsed.date_value, parsed.time_value)
                 ]
         return candidates
+
+    def _search_target_candidates(self, session_id: str, command: AssistantCommand):
+        query = command.target_query or ""
+        matching = self.events.search_events(
+            session_id, query, event_type=command.event_type, limit=5
+        )
+        if matching:
+            return matching
+        # Provider output sometimes keeps an opaque label (for example R32)
+        # that was not preserved in the event title. Retry using descriptive words.
+        words = normalize_text(query).split()
+        descriptive = " ".join(
+            word for word in words
+            if not re.fullmatch(r"[a-zа-я]+\d+[a-zа-я0-9-]*", word)
+        )
+        if descriptive and descriptive != normalize_text(query):
+            return self.events.search_events(
+                session_id, descriptive, event_type=command.event_type, limit=5
+            )
+        return matching
 
     @staticmethod
     def _event_matches_datetime(event, expected_date, expected_time=None):

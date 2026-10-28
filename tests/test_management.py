@@ -589,3 +589,63 @@ def test_clearing_task_time_removes_due_at(db):
 
     assert result.created_event.due_date == "2026-10-16"
     assert result.created_event.due_at is None
+
+
+def test_update_after_meeting_time_clarification_finds_context(db):
+    session_id = str(uuid4())
+    assistant = service(db)
+    created = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Поставь встречу с врачом завтра",
+            title="Встреча с врачом",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-16T09:00:00+03:00"),
+        ),
+        "user_text",
+    ).created_event
+
+    result = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.UPDATE_EVENT,
+            transcript="Перенеси встречу с врачом на послезавтра",
+            target_query="встречу с врачом послезавтра",
+            event_type=EventType.MEETING,
+        ),
+        "user_text",
+    )
+
+    assert result.created_event.id == created.id
+    assert result.created_event.starts_at == "2026-10-17T09:00:00+03:00"
+
+
+def test_delete_compound_title_can_ignore_unindexed_label(db):
+    session_id = str(uuid4())
+    assistant = service(db)
+    created = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Добавь встречу R32 с дизайнером завтра в 15:00",
+            title="Встреча с дизайнером",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-29T15:00:00+03:00"),
+        ),
+        "user_text",
+    ).created_event
+
+    result = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.DELETE_EVENT,
+            transcript="Удали встречу R32 с дизайнером",
+            target_query="встреча R32 с дизайнером",
+            event_type=EventType.MEETING,
+        ),
+        "user_text",
+    )
+
+    assert result.created_event.id == created.id
+    assert result.created_event.status == EventStatus.CANCELLED.value
