@@ -3,7 +3,7 @@ from datetime import datetime, time, timedelta
 
 from app.domain.commands import Action, AssistantCommand, EventStatus, EventType
 from app.services.datetime_parser import ParsedPeriod, combine, parse_datetime_parts, parse_period
-from app.services.text import extract_search_query, normalize_text
+from app.services.text import extract_search_query, extract_target_query, normalize_text
 
 
 WEEKDAY_ALIASES = {
@@ -160,6 +160,11 @@ def normalize_command(
             if action == Action.CREATE_TASK and command.due_at is None and command.starts_at:
                 updates.update({"due_at": command.starts_at, "starts_at": None, "ends_at": None})
 
+    if command.action in {Action.UPDATE_EVENT, Action.DELETE_EVENT, Action.COMPLETE_EVENT}:
+        target_query = extract_target_query(source)
+        if target_query:
+            updates["target_query"] = target_query
+
     if command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS}:
         text = normalize_text(source_text or command.transcript)
         requested_types = []
@@ -251,6 +256,7 @@ def _is_list_request(text: str) -> bool:
         "покажи встречи",
         "есть ли события",
         "есть что-нибудь", "есть что нибудь", "есть ли что",
+        "покажи завершенные", "покажи завершённые", "покажи готовые", "покажи сделанные",
         "мои планы",
     )
     plural_list = bool(

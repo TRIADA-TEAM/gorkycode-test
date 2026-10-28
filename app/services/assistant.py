@@ -28,7 +28,7 @@ from app.services.commands import (
 )
 from app.services.datetime_parser import combine, parse_datetime_parts
 from app.services.events import DialogueService, EventService
-from app.services.text import extract_target_query, normalize_text
+from app.services.text import extract_search_query, extract_target_query, normalize_text
 
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,15 @@ class AssistantService:
         preflight = self._preflight_text(session_id, text, "user_text")
         if preflight:
             return preflight
+        if _is_search_request(normalize_text(text)):
+            command = AssistantCommand(
+                action=Action.SEARCH_EVENTS,
+                transcript=text,
+                event_type=detect_event_type(text),
+                query=extract_search_query(text),
+            )
+            command = self._normalize_and_log(command, pending, source_text=text)
+            return self.execute(session_id, command, "user_text")
         command = await self.client.interpret(
             text=text,
             now_iso=self._now_iso(),

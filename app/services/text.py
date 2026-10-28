@@ -50,6 +50,7 @@ def extract_search_query(value: str) -> str:
 
 def extract_target_query(value: str) -> str:
     """Keep meaningful target words for update/delete commands."""
+    identifiers = [item.lower() for item in re.findall(r"[a-zа-я]+-\d+", value, re.IGNORECASE)]
     words = normalize_text(value).split()
     management_words = {
         "измени", "изменить", "перенеси", "перенести", "поставь", "поставить",
@@ -58,13 +59,17 @@ def extract_target_query(value: str) -> str:
         "напоминание", "напоминания", "на", "в", "до", "послезавтра",
         "завтра", "сегодня", "вчера",
     }
+    identifier_parts = {
+        part for identifier in identifiers for part in identifier.split("-")
+    }
     terms = [
         word for word in words
         if word not in management_words
+        and word not in identifier_parts
         and not re.fullmatch(r"\d{1,2}(:\d{2})?", word)
         and len(word) >= 2
     ]
-    return " ".join(terms)
+    return " ".join([*identifiers, *terms])
 
 
 def word_stem(value: str) -> str:

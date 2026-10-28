@@ -370,6 +370,22 @@ def test_conversational_meeting_question_is_search():
     assert result.event_type == EventType.MEETING
 
 
+def test_short_update_extracts_target_from_original_text():
+    command = AssistantCommand(
+        action=Action.UPDATE_EVENT,
+        transcript="Ответ модели",
+        target_query=None,
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Измени CHECK-01 на 12:00",
+    )
+
+    assert result.target_query == "check-01"
+
+
 def test_between_hours_period_has_time_bounds():
     command = AssistantCommand(action=Action.LIST_EVENTS, transcript="Что у меня между 10 и 12?")
 

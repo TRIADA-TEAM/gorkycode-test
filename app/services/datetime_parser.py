@@ -214,6 +214,12 @@ def parse_period(value: str, now: datetime) -> ParsedPeriod:
     if "на следующей неделе" in text or "следующую неделю" in text:
         start = today + timedelta(days=7 - now.weekday())
         return ParsedPeriod(start, start + timedelta(days=6))
+    if "в следующем месяце" in text or "на следующий месяц" in text:
+        year = now.year + (1 if now.month == 12 else 0)
+        month = 1 if now.month == 12 else now.month + 1
+        start = date(year, month, 1)
+        end = date(year, month, calendar.monthrange(year, month)[1])
+        return ParsedPeriod(start, end)
     if "на этой неделе" in text or "эту неделю" in text:
         start = today - timedelta(days=now.weekday())
         return ParsedPeriod(start, start + timedelta(days=6))

@@ -93,3 +93,10 @@ def test_iso_date_is_parsed():
 
     assert result.date_value == date(2026, 11, 3)
     assert result.time_value == time(10, 0)
+
+
+def test_next_month_period_is_resolved():
+    result = parse_period("Создай задачу в следующем месяце", NOW)
+
+    assert result.start == date(2026, 11, 1)
+    assert result.end == date(2026, 11, 30)
