@@ -22,6 +22,15 @@ def normalize_command(
 ) -> AssistantCommand:
     """Map occasionally inconsistent model fields to application semantics."""
     transcript_text = normalize_text(source_text or command.transcript)
+    if transcript_text.startswith(("измени ", "перенеси ")) or (
+        transcript_text.startswith("поставь ")
+        and not any(word in transcript_text for word in ("задач", "встреч", "напомни"))
+    ):
+        command = command.model_copy(update={"action": Action.UPDATE_EVENT})
+    elif transcript_text.startswith(("удали ", "отмени ")):
+        command = command.model_copy(update={"action": Action.DELETE_EVENT})
+    elif transcript_text.startswith(("отметь ", "заверши ")):
+        command = command.model_copy(update={"action": Action.COMPLETE_EVENT})
     if (
         command.action in {Action.CREATE_TASK, Action.CREATE_MEETING}
         and " и " in f" {transcript_text} "

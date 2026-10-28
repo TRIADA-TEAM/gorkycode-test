@@ -91,6 +91,11 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         target = now.date() + timedelta(days=6 - now.weekday())
         return ParsedDateTime(target, None, True, False)
 
+    if "в следующем месяце" in text or "на следующий месяц" in text:
+        year = now.year + (1 if now.month == 12 else 0)
+        month = 1 if now.month == 12 else now.month + 1
+        return ParsedDateTime(date(year, month, 1), None, True, False)
+
     iso_numeric = re.search(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b", text)
     if iso_numeric:
         try:

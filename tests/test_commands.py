@@ -386,6 +386,23 @@ def test_short_update_extracts_target_from_original_text():
     assert result.target_query == "check-01"
 
 
+def test_management_action_is_detected_from_original_text():
+    command = AssistantCommand(
+        action=Action.CLARIFY,
+        transcript="Ответ модели",
+        clarification_question="Уточните запрос",
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-15T12:00:00+03:00"),
+        source_text="Отметь задачу FINAL-01 проверить договор выполненной",
+    )
+
+    assert result.action == Action.COMPLETE_EVENT
+    assert result.target_query == "final-01 проверить договор"
+
+
 def test_between_hours_period_has_time_bounds():
     command = AssistantCommand(action=Action.LIST_EVENTS, transcript="Что у меня между 10 и 12?")
 

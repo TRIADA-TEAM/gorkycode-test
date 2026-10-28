@@ -100,3 +100,9 @@ def test_next_month_period_is_resolved():
 
     assert result.start == date(2026, 11, 1)
     assert result.end == date(2026, 11, 30)
+
+
+def test_next_month_creation_date_is_resolved():
+    result = parse_datetime_parts("в следующем месяце", NOW)
+
+    assert result.date_value == date(2026, 11, 1)
