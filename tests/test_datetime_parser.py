@@ -31,6 +31,7 @@ def test_time_words_are_parsed_in_clarification_replies():
     assert parse_datetime_parts("12 утра", NOW).time_value == time(12, 0)
     assert parse_datetime_parts("6 вечера", NOW).time_value == time(18, 0)
     assert parse_datetime_parts("12 часов", NOW).time_value == time(12, 0)
+    assert parse_datetime_parts("Тест 02 в пятницу", NOW).time_value is None
 
 
 def test_relative_minutes_are_calculated():

@@ -84,6 +84,21 @@ def test_search_finds_tickets_by_keyword(db):
     assert result[0].title == "Купить билеты"
 
 
+def test_search_discards_conversational_subject_words(db):
+    session_id = str(uuid4())
+    service = EventService(db)
+    service.create_task(
+        session_id,
+        command(title="Отправить письмо", transcript="Отправить письмо"),
+        "user_text",
+    )
+
+    result = service.search_events(session_id, "то, что связано с письмом")
+
+    assert len(result) == 1
+    assert result[0].title == "Отправить письмо"
+
+
 def test_search_uses_natural_language_subject_and_word_forms(db):
     session_id = str(uuid4())
     service = EventService(db)

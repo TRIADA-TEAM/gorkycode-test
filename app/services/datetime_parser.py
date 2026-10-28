@@ -147,12 +147,18 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
     else:
         invalid_time = bool(re.search(r"\b\d{1,2}:\d{2}\b", time_text))
         hour = re.search(
-            r"(?:\bв\s+|^|\s)([01]?\d|2[0-3])(?:\s+час(?:а|ов)?)?\s*(утра|дня|вечера)?\b",
+            r"\bв\s+([01]?\d|2[0-3])(?:\s+час(?:а|ов)?)?\s*(утра|дня|вечера)?\b",
             time_text,
         )
+        if not hour:
+            hour = re.fullmatch(
+                r"\s*([01]?\d|2[0-3])\s*(час(?:а|ов)?|утра|дня|вечера)\s*",
+                time_text,
+            )
         if hour:
             hour_value = int(hour.group(1))
-            if hour.group(2) in {"дня", "вечера"} and hour_value < 12:
+            meridiem = hour.group(2) if hour.lastindex and hour.lastindex >= 2 else None
+            if meridiem in {"дня", "вечера"} and hour_value < 12:
                 hour_value += 12
             time_value = time(hour_value, 0)
         elif "полдень" in time_text:
