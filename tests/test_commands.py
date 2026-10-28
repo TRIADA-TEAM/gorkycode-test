@@ -274,6 +274,24 @@ def test_invalid_clock_time_requires_correction():
     assert "некорректно" in result.clarification_question
 
 
+def test_past_meeting_question_is_detected_as_search():
+    command = AssistantCommand(
+        action=Action.CLARIFY,
+        transcript="Перефразированный ответ модели",
+        clarification_question="Уточните запрос",
+    )
+
+    result = normalize_command(
+        command,
+        datetime.fromisoformat("2026-10-28T12:00:00+03:00"),
+        source_text="Когда у меня была встреча с дизайнером?",
+    )
+
+    assert result.action == Action.SEARCH_EVENTS
+    assert result.event_type == EventType.MEETING
+    assert result.query == "дизайнером"
+
+
 def test_generic_planned_events_start_from_current_moment():
     command = AssistantCommand(
         action=Action.LIST_EVENTS,
