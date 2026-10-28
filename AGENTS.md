@@ -54,6 +54,9 @@ Out of scope for the first version:
 - On screens up to 560 px, scrolling the chat collapses the top bar and intro
   after 24 px so the dialogue gains vertical space. Returning the chat to its
   top restores them; the composer remains visible throughout.
+- The browser keeps up to 60 recent user/assistant messages per anonymous
+  session in `localStorage` and restores them after reload. Event updates,
+  completion, and deletion also update or remove stored event cards.
 - Time zone: `Europe/Moscow` until the product rules are revisited.
 - No seed dataset or seed import is used. Tests create their own isolated data.
 
@@ -176,6 +179,9 @@ Current provisional time rules:
   `состоявшиеся`, and `завершившиеся`; future synonyms include `будущие`,
   `предстоящие`, `ближайшие`, and `грядущие`. Temporal qualifiers are filters,
   not search subject terms;
+- list/search commands may contain multiple explicit event types. Preserve the
+  exact requested set through `event_types`; do not collapse `задачи и встречи`
+  to only one type or expand it to include reminders;
 - an explicit new creation command (`добавь`, `создай`, `поставь`, `напомни`,
   `назначь`, `запланируй`) replaces an unfinished creation instead of inheriting
   its date or time. The new event must independently provide all required data;

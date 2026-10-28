@@ -54,6 +54,17 @@ def test_mobile_chat_collapse_assets_are_served():
     assert ".mobile-chat-scrolled .topbar" in responsive.text
 
 
+def test_browser_history_and_readable_validation_assets_are_served():
+    with TestClient(app) as client:
+        script = client.get("/static/app.js")
+
+    assert script.status_code == 200
+    assert "assistant-history:" in script.text
+    assert "restoreChatHistory();" in script.text
+    assert 'addMessage("assistant", "Введите название.")' in script.text
+    assert "Value error" in script.text
+
+
 def test_text_endpoint_preserves_clarification_between_requests(db, monkeypatch):
     session_id = str(uuid4())
     model = ScriptedClient(
@@ -355,3 +366,15 @@ def test_event_edit_rejects_empty_body():
         )
 
     assert response.status_code == 422
+
+
+def test_event_edit_rejects_whitespace_title_with_readable_detail():
+    with TestClient(app) as client:
+        response = client.patch(
+            "/api/events/1",
+            headers={"X-Session-ID": str(uuid4())},
+            json={"title": "   "},
+        )
+
+    assert response.status_code == 422
+    assert "Введите название" in response.json()["detail"][0]["msg"]

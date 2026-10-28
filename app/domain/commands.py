@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Action(StrEnum):
@@ -35,6 +35,7 @@ class AssistantCommand(BaseModel):
     transcript: str = Field(min_length=1, max_length=5000)
     title: str | None = Field(default=None, max_length=500)
     event_type: EventType | None = None
+    event_types: list[EventType] = Field(default_factory=list)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     due_at: datetime | None = None
@@ -72,6 +73,16 @@ class EventEditRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     event_date: date | None = None
     event_time: time | None = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("Введите название")
+        return value
 
     @model_validator(mode="after")
     def require_changes(self) -> "EventEditRequest":

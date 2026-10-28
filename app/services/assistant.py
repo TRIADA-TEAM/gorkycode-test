@@ -183,7 +183,11 @@ class AssistantService:
             )
         if command.action == Action.LIST_EVENTS:
             events = self.events.list_events(
-                session_id, command.date_from, command.date_to, command.event_type
+                session_id,
+                command.date_from,
+                command.date_to,
+                command.event_type,
+                event_types=command.event_types,
             )
             self.dialogue.clear_pending(session_id)
             if len(events) == 1:
@@ -202,6 +206,7 @@ class AssistantService:
                 command.date_from,
                 command.date_to,
                 command.event_type,
+                event_types=command.event_types,
             )
             self.dialogue.clear_pending(session_id)
             if len(events) == 1:

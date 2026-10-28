@@ -67,6 +67,7 @@ class EventService:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         event_type: EventType | None = None,
+        event_types: list[EventType] | None = None,
         limit: int = 50,
         statuses: set[EventStatus] | None = None,
     ) -> list[Event]:
@@ -76,7 +77,9 @@ class EventService:
         conditions = [Event.owner_session_id == session_id]
         allowed_statuses = statuses or {EventStatus.PENDING}
         conditions.append(Event.status.in_([status.value for status in allowed_statuses]))
-        if event_type:
+        if event_types:
+            conditions.append(Event.type.in_([item.value for item in event_types]))
+        elif event_type:
             conditions.append(Event.type == event_type.value)
         event_moment = func.coalesce(moment, fallback_moment, date_only)
         event_date = func.substr(event_moment, 1, 10)
@@ -107,6 +110,7 @@ class EventService:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         event_type: EventType | None = None,
+        event_types: list[EventType] | None = None,
         limit: int = 20,
     ) -> list[Event]:
         normalized = extract_search_query(query)
@@ -116,6 +120,7 @@ class EventService:
             date_from,
             date_to,
             event_type,
+            event_types=event_types,
             limit=1000,
             statuses={EventStatus.PENDING, EventStatus.COMPLETED},
         )

@@ -132,14 +132,22 @@ def normalize_command(
 
     if command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS}:
         text = normalize_text(source_text or command.transcript)
+        requested_types = []
         if "встреч" in text:
-            updates["event_type"] = EventType.MEETING
-        elif "задач" in text or any(word.startswith("дел") for word in text.split()):
-            updates["event_type"] = EventType.TASK
-        elif "напомин" in text:
-            updates["event_type"] = EventType.REMINDER
+            requested_types.append(EventType.MEETING)
+        if "задач" in text or any(word.startswith("дел") for word in text.split()):
+            requested_types.append(EventType.TASK)
+        if "напомин" in text:
+            requested_types.append(EventType.REMINDER)
+        if len(requested_types) == 1:
+            updates["event_type"] = requested_types[0]
+            updates["event_types"] = []
+        elif len(requested_types) > 1:
+            updates["event_type"] = None
+            updates["event_types"] = requested_types
         else:
             updates["event_type"] = None
+            updates["event_types"] = []
         updates["starts_at"] = None
         updates["ends_at"] = None
         updates["due_at"] = None

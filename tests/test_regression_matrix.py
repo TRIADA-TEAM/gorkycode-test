@@ -179,3 +179,24 @@ def test_temporal_words_are_removed_from_search_subject():
 
     assert result.query == "иваном"
     assert result.date_to == NOW
+
+
+@pytest.mark.parametrize(
+    ("phrase", "expected_types"),
+    [
+        ("Какие задачи и встречи у меня на завтра?", {"task", "meeting"}),
+        ("Покажи задачи и напоминания", {"task", "reminder"}),
+        (
+            "Покажи задачи, встречи и напоминания",
+            {"task", "meeting", "reminder"},
+        ),
+    ],
+)
+def test_mixed_event_type_matrix(phrase, expected_types):
+    command = AssistantCommand(action=Action.LIST_EVENTS, transcript=phrase)
+
+    result = normalize_command(command, NOW)
+
+    assert result.action == Action.LIST_EVENTS
+    assert result.event_type is None
+    assert {item.value for item in result.event_types} == expected_types

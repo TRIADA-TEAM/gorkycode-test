@@ -8,6 +8,8 @@ const speakToggle = document.querySelector("#speak-toggle");
 const suggestionChips = document.querySelectorAll(".suggestion-chip");
 
 const sessionId = getSessionId();
+const historyKey = `assistant-history:${sessionId}`;
+const historyLimit = 60;
 let recorder = null;
 let stream = null;
 let chunks = [];
@@ -83,7 +85,65 @@ function setBusy(busy, message = "Готов к работе") {
 
 const MESSAGE_TIME_ZONE = "Europe/Moscow";
 
-function addMessage(role, text, events = [], timestamp = new Date()) {
+function loadChatHistory() {
+  try {
+    const value = JSON.parse(localStorage.getItem(historyKey) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch (_) {
+    localStorage.removeItem(historyKey);
+    return [];
+  }
+}
+
+function saveChatMessage(role, messageText, events, timestamp) {
+  const history = loadChatHistory();
+  history.push({
+    role,
+    text: messageText,
+    events,
+    timestamp: timestamp.toISOString(),
+  });
+  try {
+    localStorage.setItem(historyKey, JSON.stringify(history.slice(-historyLimit)));
+  } catch (_) {
+    // A full or unavailable storage must not break the assistant itself.
+  }
+}
+
+function updateStoredEvent(eventId, updatedEvent) {
+  const history = loadChatHistory();
+  let changed = false;
+  for (const message of history) {
+    if (!Array.isArray(message.events)) continue;
+    const nextEvents = message.events
+      .map((event) => event.id === eventId ? updatedEvent : event)
+      .filter(Boolean);
+    if (nextEvents.length !== message.events.length
+        || nextEvents.some((event, index) => event !== message.events[index])) {
+      message.events = nextEvents;
+      changed = true;
+    }
+  }
+  if (changed) {
+    try { localStorage.setItem(historyKey, JSON.stringify(history)); } catch (_) {}
+  }
+}
+
+function restoreChatHistory() {
+  for (const message of loadChatHistory()) {
+    if (!message || !["user", "assistant"].includes(message.role)) continue;
+    const timestamp = new Date(message.timestamp);
+    addMessage(
+      message.role,
+      String(message.text || ""),
+      Array.isArray(message.events) ? message.events : [],
+      Number.isNaN(timestamp.getTime()) ? new Date() : timestamp,
+      false,
+    );
+  }
+}
+
+function addMessage(role, text, events = [], timestamp = new Date(), persist = true) {
   const article = document.createElement("article");
   article.className = `message ${role}`;
   const p = document.createElement("p");
@@ -106,6 +166,7 @@ function addMessage(role, text, events = [], timestamp = new Date()) {
   chat.appendChild(article);
   chat.scrollTop = chat.scrollHeight;
   updateMobileChrome();
+  if (persist) saveChatMessage(role, text, events, timestamp);
 }
 
 function createEventCard(event) {
@@ -168,7 +229,13 @@ function showEventEditor(card, event) {
   form.appendChild(buttons);
   form.addEventListener("submit", async (submitEvent) => {
     submitEvent.preventDefault();
-    const body = {title: title.input.value.trim()};
+    const normalizedTitle = title.input.value.trim();
+    if (!normalizedTitle) {
+      addMessage("assistant", "Введите название.");
+      title.input.focus();
+      return;
+    }
+    const body = {title: normalizedTitle};
     if (date.input.value) body.event_date = date.input.value;
     if (time.input.value) body.event_time = time.input.value;
     await runEventAction(card, `/api/events/${event.id}`, {
@@ -201,6 +268,10 @@ async function runEventAction(card, url, options, remove = false) {
       headers: {...(options.headers || {}), "X-Session-ID": sessionId},
     });
     const data = await parseResponse(response);
+    if (data.created_event) {
+      const hidden = remove || data.created_event.status !== "pending";
+      updateStoredEvent(data.created_event.id, hidden ? null : data.created_event);
+    }
     addMessage("assistant", data.reply);
     if (remove || data.created_event?.status !== "pending") {
       card.remove();
@@ -264,7 +335,16 @@ function formatDateOnly(value) {
 
 async function parseResponse(response) {
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail || "Не удалось обработать запрос");
+  if (!response.ok) {
+    const detail = data.detail;
+    let message = "Не удалось обработать запрос";
+    if (typeof detail === "string") {
+      message = detail;
+    } else if (Array.isArray(detail) && detail.length) {
+      message = String(detail[0]?.msg || message).replace(/^Value error,\s*/i, "");
+    }
+    throw new Error(message);
+  }
   return data;
 }
 
@@ -338,3 +418,5 @@ async function uploadRecording() {
     setBusy(false);
   }
 }
+
+restoreChatHistory();

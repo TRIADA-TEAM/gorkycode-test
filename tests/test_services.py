@@ -331,3 +331,40 @@ def test_mixed_event_types_are_sorted_by_one_timeline(db):
         "Ближайшая встреча",
         "Далекое напоминание",
     ]
+
+
+def test_mixed_type_filter_does_not_include_unrequested_type(db):
+    session_id = str(uuid4())
+    service = EventService(db)
+    target_date = datetime.fromisoformat("2026-10-29T12:00:00+03:00")
+    service.create_task(
+        session_id,
+        command(title="Задача", due_at=target_date, event_type=EventType.TASK),
+        "user_text",
+    )
+    service.create_meeting(
+        session_id,
+        command(
+            title="Встреча",
+            event_type=EventType.MEETING,
+            starts_at=target_date,
+            due_at=None,
+        ),
+        "user_text",
+    )
+    service.create_task(
+        session_id,
+        command(
+            title="Напоминание",
+            due_at=target_date,
+            event_type=EventType.REMINDER,
+        ),
+        "user_text",
+    )
+
+    result = service.list_events(
+        session_id,
+        event_types=[EventType.TASK, EventType.MEETING],
+    )
+
+    assert {event.title for event in result} == {"Задача", "Встреча"}
