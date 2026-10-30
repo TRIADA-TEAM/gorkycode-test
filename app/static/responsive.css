@@ -478,6 +478,22 @@ body {
 }
 
 
+/* The descriptive product name is longer than the original short headline. */
+@media (min-width: 561px) and (max-width: 899px) {
+  .conversation-intro h1 {
+    font-size: clamp(30px, 5vw, 40px);
+    line-height: 1.08;
+  }
+}
+
+@media (max-width: 560px) {
+  .conversation-intro h1 {
+    font-size: clamp(24px, 7.2vw, 30px);
+    line-height: 1.1;
+  }
+}
+
+
 /* Give the conversation more room once the user starts scrolling on mobile. */
 @media (max-width: 560px) {
   .app-shell,

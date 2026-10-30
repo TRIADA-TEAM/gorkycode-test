@@ -55,8 +55,9 @@
   }
 
   .conversation-intro h1 {
-    max-width: 420px;
-    font-size: clamp(38px, 4vw, 58px);
+    max-width: 440px;
+    font-size: clamp(30px, 3vw, 42px);
+    line-height: 1.08;
   }
 
   .conversation-intro .subtitle { max-width: 420px; }

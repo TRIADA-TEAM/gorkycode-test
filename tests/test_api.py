@@ -42,6 +42,7 @@ def test_desktop_split_layout_assets_are_served():
     assert 'desktop-layout.css' in styles.text
     assert desktop.status_code == 200
     assert "grid-template-columns" in desktop.text
+    assert "font-size: clamp(30px, 3vw, 42px)" in desktop.text
 
 
 def test_html_and_assets_disable_stale_browser_cache():
@@ -69,6 +70,7 @@ def test_mobile_chat_collapse_assets_are_served():
     assert responsive.status_code == 200
     assert ".mobile-chat-scrolled .topbar" in responsive.text
     assert "overflow-anchor: none" in responsive.text
+    assert "font-size: clamp(24px, 7.2vw, 30px)" in responsive.text
 
 
 def test_browser_history_and_readable_validation_assets_are_served():
