@@ -14,14 +14,36 @@ let recorder = null;
 let stream = null;
 let chunks = [];
 let mobileScrollFrame = null;
+let mobileExpandedChromeHeight = 0;
 
 const mobileLayout = window.matchMedia("(max-width: 560px)");
+const appShell = document.querySelector(".app-shell");
+const topbar = document.querySelector(".topbar");
+const conversationIntro = document.querySelector(".conversation-intro");
 
 function updateMobileChrome() {
-  const collapsed = mobileLayout.matches && chat.scrollTop > 24;
-  document.querySelector(".app-shell")?.classList.toggle(
-    "mobile-chat-scrolled", collapsed
-  );
+  if (!mobileLayout.matches) {
+    appShell?.classList.remove("mobile-chat-scrolled");
+    mobileExpandedChromeHeight = 0;
+    return;
+  }
+
+  const isCollapsed = appShell?.classList.contains("mobile-chat-scrolled") || false;
+  if (!isCollapsed) {
+    mobileExpandedChromeHeight =
+      (topbar?.offsetHeight || 0) + (conversationIntro?.offsetHeight || 0) + 12;
+  }
+
+  // Collapsing the header makes the chat taller. With a short conversation
+  // that used to remove the overflow, reset scrollTop and immediately expand
+  // the header again. Only collapse when enough overflow will remain after the
+  // extra space is given to the chat.
+  const overflow = chat.scrollHeight - chat.clientHeight;
+  const canCollapse = overflow > mobileExpandedChromeHeight + 24;
+  const shouldCollapse = isCollapsed
+    ? chat.scrollTop > 4
+    : canCollapse && chat.scrollTop > 24;
+  appShell?.classList.toggle("mobile-chat-scrolled", shouldCollapse);
 }
 
 chat.addEventListener("scroll", () => {
@@ -33,6 +55,7 @@ chat.addEventListener("scroll", () => {
 }, {passive: true});
 
 mobileLayout.addEventListener?.("change", updateMobileChrome);
+window.addEventListener("resize", updateMobileChrome, {passive: true});
 
 suggestionChips.forEach((chip) => {
   chip.addEventListener("click", () => {

@@ -1350,6 +1350,7 @@ body {
     min-height: 0;
     max-height: none;
     overflow-y: auto;
+    overflow-anchor: none;
   }
 
   .suggestions,

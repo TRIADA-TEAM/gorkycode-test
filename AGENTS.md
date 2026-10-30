@@ -53,7 +53,9 @@ Out of scope for the first version:
   the right. Narrow screens keep the compact single-column conversation.
 - On screens up to 560 px, scrolling the chat collapses the top bar and intro
   after 24 px so the dialogue gains vertical space. Returning the chat to its
-  top restores them; the composer remains visible throughout.
+  top restores them; the composer remains visible throughout. Collapse is
+  enabled only when the conversation remains scrollable after the reclaimed
+  header space, preventing short chats from oscillating between both layouts.
 - The browser keeps up to 60 recent user/assistant messages per anonymous
   session in `localStorage` and restores them after reload. Event updates,
   completion, and deletion also update or remove stored event cards.

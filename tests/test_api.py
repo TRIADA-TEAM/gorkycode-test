@@ -61,9 +61,12 @@ def test_mobile_chat_collapse_assets_are_served():
 
     assert script.status_code == 200
     assert "mobile-chat-scrolled" in script.text
-    assert "chat.scrollTop > 24" in script.text
+    assert "canCollapse && chat.scrollTop > 24" in script.text
+    assert "overflow > mobileExpandedChromeHeight + 24" in script.text
+    assert "chat.scrollTop > 4" in script.text
     assert responsive.status_code == 200
     assert ".mobile-chat-scrolled .topbar" in responsive.text
+    assert "overflow-anchor: none" in responsive.text
 
 
 def test_browser_history_and_readable_validation_assets_are_served():
