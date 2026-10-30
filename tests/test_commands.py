@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 from app.domain.commands import Action, AssistantCommand, EventStatus, EventType
 from app.services.commands import normalize_command
 
@@ -258,6 +260,39 @@ def test_completed_task_list_requests_completed_status():
     result = normalize_command(command, datetime.fromisoformat("2026-10-15T12:00:00+03:00"))
 
     assert result.statuses == [EventStatus.COMPLETED]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Покажи невыполненные задачи",
+        "Покажи незавершенные задачи",
+        "Покажи несделанные задачи",
+    ],
+)
+def test_pending_task_list_negative_forms_win_over_completed_stem(text):
+    command = AssistantCommand(action=Action.LIST_EVENTS, transcript=text)
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-15T12:00:00+03:00")
+    )
+
+    assert result.statuses == [EventStatus.PENDING]
+
+
+def test_move_command_cannot_rename_event_from_provider_guess():
+    command = AssistantCommand(
+        action=Action.UPDATE_EVENT,
+        transcript="Перенеси встречу с аналитиком на послезавтра в 17:45",
+        target_query="встреча с аналитиком",
+        new_title="Встреча с аналитиком",
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-15T12:00:00+03:00")
+    )
+
+    assert result.new_title is None
 
 
 def test_invalid_clock_time_requires_correction():

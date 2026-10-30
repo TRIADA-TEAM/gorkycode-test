@@ -79,6 +79,13 @@ def test_winter_period_crosses_year_boundary():
     assert result.end == date(2027, 2, 28)
 
 
+def test_word_containing_summer_stem_is_not_a_season():
+    result = parse_period("Найди задачу про билеты", NOW)
+
+    assert result.start is None
+    assert result.end is None
+
+
 def test_explicit_date_range_includes_both_boundaries():
     result = parse_period(
         "Что у меня с 29 октября по 31 октября 2026?", NOW

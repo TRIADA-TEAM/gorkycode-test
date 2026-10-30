@@ -173,6 +173,12 @@ def normalize_command(
         target_query = extract_target_query(source)
         if target_query:
             updates["target_query"] = target_query
+        if command.action == Action.UPDATE_EVENT and command.new_title:
+            rename_markers = ("переимен", "назови", "название", "имя события")
+            if not any(marker in transcript_text for marker in rename_markers):
+                # A move changes only date/time. The provider may paraphrase the
+                # target into new_title, which must not silently rename it.
+                updates["new_title"] = None
 
     if command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS}:
         text = normalize_text(source_text or command.transcript)
@@ -197,10 +203,12 @@ def normalize_command(
         else:
             updates["event_type"] = None
             updates["event_types"] = []
-        if any(marker in text for marker in ("выполнен", "завершен", "завершен", "сделан", "готов")):
-            updates["statuses"] = [EventStatus.COMPLETED]
-        elif "невыполн" in text or "незаверш" in text:
+        # Negative forms contain the positive stem ("невыполненные" includes
+        # "выполнен"), so they must be recognized first.
+        if any(marker in text for marker in ("невыполн", "незаверш", "несделан")):
             updates["statuses"] = [EventStatus.PENDING]
+        elif any(marker in text for marker in ("выполнен", "завершен", "сделан", "готов")):
+            updates["statuses"] = [EventStatus.COMPLETED]
         updates["starts_at"] = None
         updates["ends_at"] = None
         updates["due_at"] = None

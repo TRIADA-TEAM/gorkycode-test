@@ -182,9 +182,15 @@ Current provisional time rules:
   `состоявшиеся`, and `завершившиеся`; future synonyms include `будущие`,
   `предстоящие`, `ближайшие`, and `грядущие`. Temporal qualifiers are filters,
   not search subject terms;
+- season names are recognized only as separate words with the corresponding
+  stem. A stem inside an unrelated word (for example `лет` in `билеты`) must
+  not introduce a hidden summer date range;
 - list/search commands may contain multiple explicit event types. Preserve the
   exact requested set through `event_types`; do not collapse `задачи и встречи`
   to only one type or expand it to include reminders;
+- negative status forms (`невыполненные`, `незавершённые`, `несделанные`) are
+  resolved before positive stems such as `выполнен`; they select only pending
+  tasks or reminders. Positive completion wording selects completed records;
 - an explicit new creation command (`добавь`, `создай`, `поставь`, `напомни`,
   `назначь`, `запланируй`) replaces an unfinished creation instead of inheriting
   its date or time. The new event must independently provide all required data;
@@ -197,6 +203,10 @@ Current provisional time rules:
   and voice assistant endpoints used for creation.
 - Updating only the date preserves an existing time; updating only the time
   preserves an existing date. Meeting duration is preserved when moved.
+- Moving an event must never rename it from a provider paraphrase. `new_title`
+  from text or voice is accepted only when the user explicitly asks to rename
+  the event (for example with `переименуй` or `измени название`); direct event
+  card edits remain deterministic and may update the title explicitly.
 - A task without a deadline can be renamed without inventing a date. Supplying
   only a time for such a task requires clarification of the date.
 - Tasks and reminders can be marked completed. Meetings cannot be completed;

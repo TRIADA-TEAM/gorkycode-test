@@ -2,6 +2,8 @@ import asyncio
 from datetime import datetime
 from uuid import uuid4
 
+import pytest
+
 from app.config import Settings
 from app.domain.commands import Action, AssistantCommand, EventStatus, EventType
 from app.services.assistant import AssistantService
@@ -74,6 +76,32 @@ def test_update_meeting_date_preserves_time_and_duration(db):
     assert result.created_event.id == created.id
     assert result.created_event.starts_at == "2026-10-22T15:00:00+03:00"
     assert result.created_event.ends_at == "2026-10-22T16:00:00+03:00"
+
+
+def test_text_move_ignores_provider_attempt_to_rename_meeting(db):
+    session_id = str(uuid4())
+    assistant = service(db, [
+        AssistantCommand(
+            action=Action.UPDATE_EVENT,
+            transcript="Перенеси встречу с аналитиком на 22 октября в 17:45",
+            target_query="встреча с аналитиком",
+            new_title="Встреча с аналитиком",
+        )
+    ])
+    assistant.execute(
+        session_id,
+        meeting_command("QA100-B встреча с аналитиком", 20, 15),
+        "user_text",
+    )
+
+    result = asyncio.run(
+        assistant.handle_text(
+            session_id, "Перенеси встречу с аналитиком на 22 октября в 17:45"
+        )
+    )
+
+    assert result.created_event.title == "QA100-B встреча с аналитиком"
+    assert result.created_event.starts_at == "2026-10-22T17:45:00+03:00"
 
 
 def test_last_reference_supports_pronoun_update(db):
@@ -395,6 +423,57 @@ def test_adjacent_meetings_do_not_conflict(db):
     assert result.created_event.starts_at == "2026-10-20T16:00:00+03:00"
 
 
+@pytest.mark.parametrize(
+    ("starts_at", "ends_at"),
+    [
+        ("2026-10-20T14:30:00+03:00", "2026-10-20T15:30:00+03:00"),
+        ("2026-10-20T15:30:00+03:00", "2026-10-20T16:30:00+03:00"),
+        ("2026-10-20T15:15:00+03:00", "2026-10-20T15:45:00+03:00"),
+        ("2026-10-20T14:00:00+03:00", "2026-10-20T17:00:00+03:00"),
+    ],
+)
+def test_all_strict_meeting_overlap_shapes_require_confirmation(
+    db, starts_at, ends_at
+):
+    session_id = str(uuid4())
+    assistant = service(db)
+    assistant.execute(
+        session_id, meeting_command("Первая встреча", 20, 15), "user_text"
+    )
+
+    result = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Добавь пересекающуюся встречу",
+            title="Вторая встреча",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat(starts_at),
+            ends_at=datetime.fromisoformat(ends_at),
+        ),
+        "user_text",
+    )
+
+    assert result.needs_clarification is True
+    assert len(assistant.events.list_events(session_id)) == 1
+
+
+def test_meetings_in_different_sessions_do_not_conflict(db):
+    first_session = str(uuid4())
+    second_session = str(uuid4())
+    assistant = service(db)
+    assistant.execute(
+        first_session, meeting_command("Первая встреча", 20, 15), "user_text"
+    )
+
+    result = assistant.execute(
+        second_session, meeting_command("Вторая встреча", 20, 15), "user_text"
+    )
+
+    assert result.needs_clarification is False
+    assert result.created_event.title == "Вторая встреча"
+
+
 def test_moving_meeting_into_conflict_requires_confirmation(db):
     session_id = str(uuid4())
     assistant = service(db)
@@ -557,6 +636,50 @@ def test_expanded_conflict_confirmation_is_accepted(db):
     assert conflict.needs_clarification is True
     assert result.needs_clarification is False
     assert result.created_event.title == "Вторая встреча"
+
+
+def test_conflict_is_checked_after_time_clarification_and_expanded_confirmation(db):
+    session_id = str(uuid4())
+    assistant = service(db, [
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="В 15:00",
+            title="Вторая встреча",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-15T15:00:00+03:00"),
+        ),
+        AssistantCommand(
+            action=Action.CLARIFY,
+            transcript="Да, продолжить",
+            clarification_question="Подтвердите действие.",
+        ),
+    ])
+    assistant.execute(
+        session_id, meeting_command("Первая встреча", 20, 15), "user_text"
+    )
+    clarification = assistant.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Добавь встречу 20 октября",
+            title="Вторая встреча",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-20T09:00:00+03:00"),
+            missing_fields=["start_time"],
+            clarification_question="На какое время поставить встречу?",
+        ),
+        "user_text",
+    )
+
+    conflict = asyncio.run(assistant.handle_text(session_id, "В 15:00"))
+    confirmed = asyncio.run(assistant.handle_text(session_id, "Да, продолжить"))
+
+    assert clarification.needs_clarification is True
+    assert conflict.needs_clarification is True
+    assert conflict.reply == "На это время уже запланирована другая встреча. Всё равно продолжить?"
+    assert confirmed.needs_clarification is False
+    assert confirmed.created_event.title == "Вторая встреча"
+    assert len(assistant.events.list_events(session_id)) == 2
 
 
 def test_clearing_task_time_removes_due_at(db):

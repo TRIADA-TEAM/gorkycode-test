@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.config import Settings
 from app.db.base import Event
-from app.domain.commands import Action, AssistantCommand, EventType
+from app.domain.commands import Action, AssistantCommand, EventStatus, EventType
 from app.services.assistant import AssistantService, list_reply
 
 
@@ -25,6 +25,72 @@ def test_empty_list_reply_uses_requested_event_type():
     assert list_reply(0, EventType.TASK) == "Задач не найдено."
     assert list_reply(0, EventType.MEETING) == "Встреч не найдено."
     assert list_reply(0, None) == "Событий не найдено."
+
+
+def test_pending_status_filter_excludes_completed_tasks_end_to_end(db):
+    session_id = str(uuid4())
+    client = ScriptedClient([
+        AssistantCommand(
+            action=Action.LIST_EVENTS,
+            transcript="Покажи невыполненные задачи на 20 октября 2026",
+            event_type=EventType.TASK,
+            statuses=[EventStatus.COMPLETED],
+        )
+    ])
+    service = AssistantService(db, Settings(), client, lambda: NOW)
+    completed = service.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Создай задачу Готовая на 20 октября 2026",
+            title="Готовая",
+            event_type=EventType.TASK,
+            due_date=datetime.fromisoformat("2026-10-20").date(),
+        ),
+        "user_text",
+    ).created_event
+    service.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Создай задачу Активная на 20 октября 2026",
+            title="Активная",
+            event_type=EventType.TASK,
+            due_date=datetime.fromisoformat("2026-10-20").date(),
+        ),
+        "user_text",
+    )
+    service.events.set_status(
+        service.events.get_owned(session_id, completed.id), EventStatus.COMPLETED
+    )
+
+    result = asyncio.run(
+        service.handle_text(
+            session_id, "Покажи невыполненные задачи на 20 октября 2026"
+        )
+    )
+
+    assert [event.title for event in result.events] == ["Активная"]
+
+
+def test_ticket_search_works_through_assistant_flow(db):
+    session_id = str(uuid4())
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+    service.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Создай задачу QA100-F купить билеты на 20 октября",
+            title="QA100-F купить билеты",
+            event_type=EventType.TASK,
+            due_date=datetime.fromisoformat("2026-10-20").date(),
+        ),
+        "user_text",
+    )
+
+    result = asyncio.run(service.handle_text(session_id, "Найди задачу про билеты"))
+
+    assert [event.title for event in result.events] == ["QA100-F купить билеты"]
 
 
 class ScriptedClient:

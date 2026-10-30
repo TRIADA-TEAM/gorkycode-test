@@ -262,8 +262,9 @@ def parse_period(value: str, now: datetime) -> ParsedPeriod:
         "лет": (6, 7, 8),
         "осен": (9, 10, 11),
     }
+    words = text.split()
     for stem, months in seasons.items():
-        if stem not in text:
+        if not any(word.startswith(stem) for word in words):
             continue
         if months[0] == 12:
             year = now.year if now.month == 12 else now.year if now.month > 12 else now.year
