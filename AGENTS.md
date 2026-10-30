@@ -195,7 +195,10 @@ Current provisional time rules:
   `назначь`, `запланируй`) replaces an unfinished creation instead of inheriting
   its date or time. The new event must independently provide all required data;
 - relative-date behavior will be refined later and must be covered by tests with
-  a fixed application clock.
+  a fixed application clock;
+- an unqualified weekday means the next occurrence strictly after today. On a
+  Friday, `в пятницу` resolves to the following Friday; use `сегодня` for the
+  current day;
 
 ## Event management rules
 
@@ -237,6 +240,12 @@ Use deterministic search, not RAG:
 4. Multi-word queries require every meaningful term to match. Do not return
    `кино с Марусей` for `кино с Иваном` merely because `кино` matches.
 5. Return a small ranked result set.
+
+Conversational framing such as `я когда-то ставил задачу ... найди её` is not
+part of the search subject and must be removed before matching. Deterministic
+stemming should map common action/derived-noun pairs to one root, for example
+`согласовать` and `согласование`, while the all-meaningful-terms rule remains
+in force.
 
 SQLite FTS5, embeddings, a vector database, and RAG are not required for this
 test project. Reconsider them only if deterministic search proves insufficient.

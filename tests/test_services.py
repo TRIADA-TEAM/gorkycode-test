@@ -166,6 +166,27 @@ def test_search_prefers_results_matching_all_keywords(db):
     assert [event.title for event in result] == ["Подготовить материалы"]
 
 
+def test_derived_word_search_still_requires_every_meaningful_term(db):
+    session_id = str(uuid4())
+    service = EventService(db)
+    for title in (
+        "Согласовать договор",
+        "Подписать договор",
+        "Согласовать бюджет",
+    ):
+        service.create_task(
+            session_id,
+            command(title=title, transcript=title),
+            "user_text",
+        )
+
+    result = service.search_events(
+        session_id, "Найди задачу про согласование договора"
+    )
+
+    assert [event.title for event in result] == ["Согласовать договор"]
+
+
 def test_search_respects_date_range(db):
     session_id = str(uuid4())
     service = EventService(db)

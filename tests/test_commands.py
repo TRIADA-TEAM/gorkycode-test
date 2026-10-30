@@ -61,6 +61,22 @@ def test_nearest_weekday_is_calculated_from_application_clock():
     assert result.due_at is None
 
 
+def test_unqualified_current_weekday_means_next_week():
+    command = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="В пятницу нужно отправить отчет",
+        title="Отправить отчет",
+        event_type=EventType.TASK,
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-30T14:24:00+03:00")
+    )
+
+    assert result.due_date.isoformat() == "2026-11-06"
+    assert result.due_at is None
+
+
 def test_task_without_date_does_not_get_model_invented_deadline():
     command = AssistantCommand(
         action=Action.CREATE_TASK,

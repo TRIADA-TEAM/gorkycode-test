@@ -93,6 +93,34 @@ def test_ticket_search_works_through_assistant_flow(db):
     assert [event.title for event in result.events] == ["QA100-F купить билеты"]
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Я когда-то ставил задачу по договору, найди ее",
+        "Найди задачу про согласование договора",
+        "Найди задачу по договору",
+    ],
+)
+def test_assignment_contract_search_phrases_find_existing_task(db, query):
+    session_id = str(uuid4())
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+    service.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Создай задачу согласовать договор послезавтра",
+            title="Согласовать договор",
+            event_type=EventType.TASK,
+            due_date=datetime.fromisoformat("2026-10-17").date(),
+        ),
+        "user_text",
+    )
+
+    result = asyncio.run(service.handle_text(session_id, query))
+
+    assert [event.title for event in result.events] == ["Согласовать договор"]
+
+
 class ScriptedClient:
     def __init__(self, commands: list[AssistantCommand]) -> None:
         self.commands = iter(commands)
