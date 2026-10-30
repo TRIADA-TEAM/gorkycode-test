@@ -72,8 +72,7 @@ def test_mobile_chat_collapse_assets_are_served():
     assert ".mobile-chat-scrolled .topbar" in responsive.text
     assert "overflow-anchor: none" in responsive.text
     assert "font-size: clamp(24px, 7.2vw, 30px)" in responsive.text
-    assert 'class="mobile-title-break"' in page.text
-    assert ".mobile-title-break" in responsive.text
+    assert '<h1 id="page-title">Голосовой помощник</h1>' in page.text
 
 
 def test_browser_history_and_readable_validation_assets_are_served():
