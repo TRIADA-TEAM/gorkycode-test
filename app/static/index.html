@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f6fb">
-  <title>Тихий план — ваш личный планировщик</title>
+  <title>Голосовой помощник для задач, встреч и напоминаний — Триада для GorkyCode</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -13,9 +13,9 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="Тихий план">
+      <a class="brand" href="/" aria-label="Голосовой помощник для задач, встреч и напоминаний">
         <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
-        <span><strong>Тихий план</strong><small>личный планировщик</small></span>
+        <span><strong>Голосовой помощник</strong><small>Триада · GorkyCode</small></span>
       </a>
       <div class="topbar-actions"><span id="today-label" class="today-label">Сегодня</span><span class="online-dot" aria-hidden="true"></span><span class="online-text">Синхронизировано</span></div>
     </header>
@@ -23,14 +23,14 @@
       <section class="conversation-panel" aria-labelledby="page-title">
         <div class="conversation-intro">
           <p class="eyebrow">Задачи · встречи · напоминания</p>
-          <h1 id="page-title">Освободите голову<br><em>для важного.</em></h1>
-          <p class="subtitle">Напишите или скажите, что нужно запланировать.<br>Я помогу разложить дела по местам.</p>
+          <h1 id="page-title">Голосовой помощник для задач,<br><em>встреч и напоминаний.</em></h1>
+          <p class="subtitle">Сделано командой «Триада» для GorkyCode.</p>
           <aside class="today-card" aria-label="Подсказка по использованию"><span class="today-icon" aria-hidden="true">✦</span><div><strong>Начните с простого</strong><p>«Напомни завтра в 10 позвонить Ивану»</p></div></aside>
           <div class="suggestions" aria-label="Примеры команд"><span class="suggestions-label">Попробуйте</span><button class="suggestion-chip" type="button">Добавь встречу завтра в 15:00</button><button class="suggestion-chip" type="button">Что у меня на этой неделе?</button></div>
         </div>
         <section id="chat" class="chat" aria-live="polite" aria-label="История диалога">
           <div class="chat-header"><span class="section-kicker">Текущий диалог</span><span class="chat-context"><span class="context-dot"></span> Сессия сохранится</span></div>
-          <article class="message assistant welcome-message"><span class="message-label">Тихий план</span><p>Я рядом. Расскажите о задаче или встрече — можно обычными словами.</p></article>
+          <article class="message assistant welcome-message"><span class="message-label">Голосовой помощник</span><p>Я рядом. Расскажите о задаче или встрече — можно обычными словами.</p></article>
         </section>
         <form id="text-form" class="composer">
           <label class="sr-only" for="text-input">Сообщение ассистенту</label>

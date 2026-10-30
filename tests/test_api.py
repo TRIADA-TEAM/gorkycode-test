@@ -34,6 +34,8 @@ def test_desktop_split_layout_assets_are_served():
         desktop = client.get("/static/desktop-layout.css")
 
     assert page.status_code == 200
+    assert "Голосовой помощник для задач, встреч и напоминаний" in page.text
+    assert "Сделано командой «Триада» для GorkyCode." in page.text
     assert page.text.count('class="suggestion-chip"') == 2
     assert page.text.index('class="suggestions"') < page.text.index('id="chat"')
     assert styles.status_code == 200

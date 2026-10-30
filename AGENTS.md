@@ -8,6 +8,11 @@ public service URL. Reviewers will test the deployed service themselves, so the
 happy path, error handling, setup instructions, and demo data must work without
 manual intervention.
 
+Public presentation copy:
+
+- `Голосовой помощник для задач, встреч и напоминаний.`
+- `Сделано командой «Триада» для GorkyCode.`
+
 The source assignment is
 `Тестовое_задание_голосовой_ассистент_для_задач_и_встреч.pdf`.
 Follow `IMPLEMENTATION_PLAN.md` for the agreed architecture, API, data model,

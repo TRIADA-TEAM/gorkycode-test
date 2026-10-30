@@ -25,7 +25,10 @@ logging.basicConfig(
 )
 
 
-app = FastAPI(title="Голосовой ассистент", version="0.1.0")
+app = FastAPI(
+    title="Голосовой помощник для задач, встреч и напоминаний",
+    version="0.1.0",
+)
 app.include_router(router)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
