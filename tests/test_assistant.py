@@ -121,6 +121,65 @@ def test_assignment_contract_search_phrases_find_existing_task(db, query):
     assert [event.title for event in result.events] == ["Согласовать договор"]
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Найди, пожалуйста, задачу про договор",
+        "Поищи, пожалуйста, что я планировал сделать с договором",
+        "Покажи ту задачу, где речь шла о договоре",
+        "Когда запланировано согласование договора?",
+    ],
+)
+def test_core_02_free_form_search_finds_only_target_task(db, query):
+    session_id = str(uuid4())
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+    for title in (
+        "Согласовать договор",
+        "Подписать акт",
+        "Согласовать бюджет",
+    ):
+        service.execute(
+            session_id,
+            AssistantCommand(
+                action=Action.CREATE_TASK,
+                transcript=f"Создай задачу {title} послезавтра",
+                title=title,
+                event_type=EventType.TASK,
+                due_date=datetime.fromisoformat("2026-10-17").date(),
+            ),
+            "user_text",
+        )
+
+    result = asyncio.run(service.handle_text(session_id, query))
+
+    assert [event.title for event in result.events] == ["Согласовать договор"]
+
+
+def test_targeted_missing_subject_does_not_fall_back_to_general_list(db):
+    session_id = str(uuid4())
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+    service.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Создай задачу Согласовать договор послезавтра",
+            title="Согласовать договор",
+            event_type=EventType.TASK,
+            due_date=datetime.fromisoformat("2026-10-17").date(),
+        ),
+        "user_text",
+    )
+
+    result = asyncio.run(
+        service.handle_text(
+            session_id, "Покажи ту задачу, где речь шла о несуществующем проекте"
+        )
+    )
+
+    assert result.action == Action.SEARCH_EVENTS.value
+    assert result.events == []
+
+
 class ScriptedClient:
     def __init__(self, commands: list[AssistantCommand]) -> None:
         self.commands = iter(commands)

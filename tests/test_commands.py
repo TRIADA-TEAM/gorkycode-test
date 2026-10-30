@@ -77,6 +77,105 @@ def test_unqualified_current_weekday_means_next_week():
     assert result.due_at is None
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Покажи ту задачу, где речь шла о договоре",
+        "Когда запланировано согласование договора?",
+    ],
+)
+def test_targeted_natural_questions_are_searches_not_lists(text):
+    command = AssistantCommand(action=Action.LIST_EVENTS, transcript=text)
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-30T14:55:00+03:00")
+    )
+
+    assert result.action == Action.SEARCH_EVENTS
+    assert result.query in {"договоре", "согласование договора"}
+
+
+def test_generic_plural_deals_list_keeps_all_event_types():
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript="Какие дела намечены на завтра?",
+        event_type=EventType.TASK,
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-30T14:55:00+03:00")
+    )
+
+    assert result.action == Action.LIST_EVENTS
+    assert result.event_type is None
+    assert result.event_types == []
+
+
+def test_generic_when_question_without_subject_remains_a_list():
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript="Когда запланированы встречи?",
+        event_type=EventType.MEETING,
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-30T14:55:00+03:00")
+    )
+
+    assert result.action == Action.LIST_EVENTS
+    assert result.query is None
+
+
+def test_generic_scheduled_period_without_subject_remains_a_list():
+    command = AssistantCommand(
+        action=Action.LIST_EVENTS,
+        transcript="Когда запланировано на завтра?",
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-30T14:55:00+03:00")
+    )
+
+    assert result.action == Action.LIST_EVENTS
+    assert result.query is None
+
+
+@pytest.mark.parametrize(
+    ("text", "provider_action", "event_type", "title"),
+    [
+        (
+            "Я планировал завтра отправить отчет",
+            Action.CREATE_TASK,
+            EventType.TASK,
+            "Отправить отчет",
+        ),
+        (
+            "Хотел завтра встретиться с Иваном",
+            Action.CREATE_MEETING,
+            EventType.MEETING,
+            "Встреча с Иваном",
+        ),
+    ],
+)
+def test_search_frame_words_do_not_change_creation_commands(
+    text, provider_action, event_type, title
+):
+    command = AssistantCommand(
+        action=provider_action,
+        transcript=text,
+        event_type=event_type,
+        title=title,
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-30T14:55:00+03:00")
+    )
+
+    assert result.action == provider_action
+    assert result.event_type == event_type
+    assert result.title == title
+
+
 def test_task_without_date_does_not_get_model_invented_deadline():
     command = AssistantCommand(
         action=Action.CREATE_TASK,

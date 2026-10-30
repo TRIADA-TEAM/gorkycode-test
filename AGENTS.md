@@ -247,7 +247,15 @@ Conversational framing such as `я когда-то ставил задачу ...
 part of the search subject and must be removed before matching. Deterministic
 stemming should map common action/derived-noun pairs to one root, for example
 `согласовать` and `согласование`, while the all-meaningful-terms rule remains
-in force.
+in force. Remove polite or narrative framing only inside search-query
+extraction and only as complete recognized phrases; never remove words such as
+`планировал` or `хотел` globally from creation text, titles, or tags.
+
+A singular thematic request such as `покажи ту задачу, где речь шла о договоре`
+or `когда запланировано согласование договора` is a search and takes precedence
+over generic list wording. Without a meaningful subject, a type/period question
+remains a list. In generic plural period questions, `дела` means all event
+types; singular `дело` in creation or targeted search continues to mean a task.
 
 SQLite FTS5, embeddings, a vector database, and RAG are not required for this
 test project. Reconsider them only if deterministic search proves insufficient.

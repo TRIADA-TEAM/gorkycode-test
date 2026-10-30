@@ -44,9 +44,11 @@ def normalize_command(
                 "clarification_question": "Я обрабатываю одну команду за раз. Уточните, какое действие выполнить первым.",
             }
         )
-    if _is_search_request(transcript_text):
+    is_search_request = _is_search_request(transcript_text)
+    is_list_request = _is_list_request(transcript_text)
+    if is_search_request:
         command = command.model_copy(update={"action": Action.SEARCH_EVENTS})
-    if _is_list_request(transcript_text):
+    elif is_list_request:
         command = command.model_copy(update={"action": Action.LIST_EVENTS})
     elif (
         command.action in {Action.LIST_EVENTS, Action.SEARCH_EVENTS}
@@ -190,7 +192,10 @@ def normalize_command(
         else:
             if "встреч" in text:
                 requested_types.append(EventType.MEETING)
-            if "задач" in text or any(word.startswith("дел") for word in text.split()):
+            generic_deals = text.startswith("какие дела") or "дела намечены" in text
+            if "задач" in text or (
+                not generic_deals and any(word.startswith("дел") for word in text.split())
+            ):
                 requested_types.append(EventType.TASK)
             if "напомин" in text:
                 requested_types.append(EventType.REMINDER)
@@ -302,9 +307,23 @@ def _has_event_query_intent(text: str) -> bool:
 
 def _is_search_request(text: str) -> bool:
     explicit_search = text.startswith(("найди ", "найти ", "поищи ", "поиск "))
+    targeted_display = bool(
+        re.search(
+            r"\bпокажи\s+(?:мне\s+)?(?:ту\s+|эту\s+|конкретную\s+)?"
+            r"(?:задачу|встречу|напоминание|событие)\b",
+            text,
+        )
+        and extract_search_query(text)
+    )
+    scheduled_subject = bool(
+        text.startswith("когда ")
+        and "запланирован" in text
+        and extract_search_query(text)
+    )
     natural_event_search = (
         ("когда" in text or "во сколько" in text)
         and any(word in text for word in ("встреч", "созвон", "совещан", "задач", "напомин"))
+        and bool(extract_search_query(text))
     )
     conversational_meeting_search = any(
         phrase in text for phrase in ("что за встреч", "расскажи про встреч", "что это за встреч")
@@ -315,8 +334,16 @@ def _is_search_request(text: str) -> bool:
             r"(?:был[аои]?|будет|будут|прошл[аои]?|предстоит|у меня)\b",
             text,
         )
+        and extract_search_query(text)
     )
-    return explicit_search or natural_event_search or conversational_meeting_search or temporal_search
+    return (
+        explicit_search
+        or targeted_display
+        or scheduled_subject
+        or natural_event_search
+        or conversational_meeting_search
+        or temporal_search
+    )
 
 
 def _temporal_direction(text: str) -> str | None:

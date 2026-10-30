@@ -42,11 +42,30 @@ def extract_tags(value: str) -> list[str]:
 
 def extract_search_query(value: str) -> str:
     """Keep the subject of a natural-language search request."""
-    words = normalize_text(value).split()
+    text = normalize_text(value)
+    # Remove complete conversational frames, not their individual meaningful
+    # words. This keeps subjects such as "планирование бюджета" or a task title
+    # containing "хотел" searchable.
+    text = re.sub(r"\bпожалуйста\b", " ", text)
+    text = re.sub(
+        r"\bчто\s+я\s+(?:планировал|планировала|хотел|хотела|"
+        r"собирался|собиралась)\s+сделать\s+(?:с|со|по|про|о|об)\b",
+        " ",
+        text,
+    )
+    text = re.sub(
+        r"\b(?:ту|эту|конкретную)\s+"
+        r"(?:задачу|встречу|напоминание|событие)\s+"
+        r"где\s+речь\s+шла\s+(?:о|об|про)\b",
+        " ",
+        text,
+    )
+    words = text.split()
     terms = [
         word
         for word in words
         if word not in SEARCH_WORDS
+        and word not in STOP_WORDS
         and not word.startswith(TEMPORAL_SEARCH_PREFIXES)
         and len(word) >= 2
     ]
