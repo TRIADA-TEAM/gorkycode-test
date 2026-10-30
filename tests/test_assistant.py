@@ -180,6 +180,35 @@ def test_targeted_missing_subject_does_not_fall_back_to_general_list(db):
     assert result.events == []
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Отыщи задание о страховом полисе",
+        "Найди ту запись, где упоминался страховой полис",
+        "Покажи, пожалуйста, запись, в которой говорилось о страховом полисе",
+        "Посмотри, пожалуйста, что я собирался делать со страховым полисом",
+    ],
+)
+def test_new_policy_search_wordings_find_existing_task(db, query):
+    session_id = str(uuid4())
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+    service.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Проверить страховой полис 20 октября",
+            title="Проверить страховой полис",
+            event_type=EventType.TASK,
+            due_date=datetime.fromisoformat("2026-10-20").date(),
+        ),
+        "user_text",
+    )
+
+    result = asyncio.run(service.handle_text(session_id, query))
+
+    assert [event.title for event in result.events] == ["Проверить страховой полис"]
+
+
 class ScriptedClient:
     def __init__(self, commands: list[AssistantCommand]) -> None:
         self.commands = iter(commands)
@@ -522,6 +551,70 @@ def test_greeting_clears_unfinished_creation(db):
 
     assert result.action == Action.CLARIFY.value
     assert assistant.dialogue.get_pending(session_id) is None
+
+
+def test_search_after_invalid_creation_does_not_execute_stale_pending(db):
+    session_id = str(uuid4())
+    client = ScriptedClient([
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Добавь задачу сдать справку завтра в 24:75",
+            title="Сдать справку",
+            event_type=EventType.TASK,
+        )
+    ])
+    first_service = AssistantService(db, Settings(), client, lambda: NOW)
+
+    first = asyncio.run(
+        first_service.handle_text(
+            session_id, "Добавь задачу сдать справку завтра в 24:75"
+        )
+    )
+    second_service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+    second = asyncio.run(
+        second_service.handle_text(session_id, "Покажи задание про итоговый бюджет")
+    )
+
+    assert first.needs_clarification is True
+    assert first.reply.startswith("Время указано некорректно")
+    assert second.action == Action.SEARCH_EVENTS.value
+    assert second.created_event is None
+    assert second_service.dialogue.get_pending(session_id) is None
+    assert db.scalars(select(Event).where(Event.owner_session_id == session_id)).all() == []
+
+
+def test_explicit_creation_replaces_unfinished_creation_without_mixing_fields(db):
+    session_id = str(uuid4())
+    client = ScriptedClient([
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Напомни завтра набрать Петра",
+            title="Набрать Петра",
+            event_type=EventType.REMINDER,
+        ),
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Запланируй на завтра на 14:00 встречу с маркетологом",
+            title="Встреча с маркетологом",
+            event_type=EventType.MEETING,
+        ),
+    ])
+    service = AssistantService(db, Settings(), client, lambda: NOW)
+
+    first = asyncio.run(
+        service.handle_text(session_id, "Напомни завтра набрать Петра")
+    )
+    second = asyncio.run(
+        service.handle_text(
+            session_id, "Запланируй на завтра на 14:00 встречу с маркетологом"
+        )
+    )
+
+    assert first.needs_clarification is True
+    assert second.needs_clarification is False
+    assert second.created_event.type == EventType.MEETING.value
+    assert second.created_event.title == "Встреча с маркетологом"
+    assert second.created_event.starts_at == "2026-10-16T14:00:00+03:00"
 
 
 def test_audio_is_transcribed_before_command_interpretation(db):

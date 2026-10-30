@@ -1,5 +1,7 @@
 from datetime import date, datetime, time
 
+import pytest
+
 from app.services.datetime_parser import parse_datetime_parts, parse_period
 
 
@@ -39,6 +41,40 @@ def test_relative_minutes_are_calculated():
 
     assert result.date_value == date(2026, 10, 15)
     assert result.time_value == time(12, 30)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_date", "expected_time"),
+    [
+        ("к десяти утра", None, time(10, 0)),
+        ("спустя два часа", date(2026, 10, 15), time(14, 0)),
+        ("через минуту", date(2026, 10, 15), time(12, 1)),
+    ],
+)
+def test_natural_relative_time_variants(text, expected_date, expected_time):
+    result = parse_datetime_parts(text, NOW)
+
+    assert result.date_value == expected_date
+    assert result.time_value == expected_time
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_start", "expected_end"),
+    [
+        ("до конца этой недели", date(2026, 10, 12), date(2026, 10, 18)),
+        ("на будущую неделю", date(2026, 10, 19), date(2026, 10, 25)),
+        (
+            "с завтрашнего дня по послезавтра включительно",
+            date(2026, 10, 16),
+            date(2026, 10, 17),
+        ),
+    ],
+)
+def test_natural_period_variants(text, expected_start, expected_end):
+    result = parse_period(text, NOW)
+
+    assert result.start == expected_start
+    assert result.end == expected_end
 
 
 def test_invalid_calendar_date_is_reported():

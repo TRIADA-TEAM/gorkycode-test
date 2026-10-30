@@ -858,3 +858,56 @@ def test_future_search_is_limited_to_events_after_current_time():
     assert result.query == "кино"
     assert result.date_from == now
     assert result.date_to is None
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_action", "expected_type", "expected_query"),
+    [
+        ("Как выглядит мой план на сегодня?", Action.LIST_EVENTS, None, None),
+        ("Сегодня есть запланированные встречи?", Action.LIST_EVENTS, EventType.MEETING, None),
+        ("Отобрази встречи за сегодняшний день", Action.LIST_EVENTS, EventType.MEETING, None),
+        ("Что предстоит сделать завтра?", Action.LIST_EVENTS, None, None),
+        ("Что из задач ещё не сделано на 1 ноября?", Action.LIST_EVENTS, EventType.TASK, None),
+        ("Отыщи задание о материалах к вебинару", Action.SEARCH_EVENTS, EventType.TASK, "материалах вебинару"),
+        ("Покажи задание про итоговый бюджет", Action.SEARCH_EVENTS, EventType.TASK, "итоговый бюджет"),
+        ("Где у меня задача сверить итоговый бюджет?", Action.SEARCH_EVENTS, EventType.TASK, "сверить итоговый бюджет"),
+        ("На какое время стоит встреча с маркетологом?", Action.SEARCH_EVENTS, EventType.MEETING, "маркетологом"),
+        ("Когда проходила моя встреча с хранителем архива?", Action.SEARCH_EVENTS, EventType.MEETING, "хранителем архива"),
+        ("Покажи, пожалуйста, запись, в которой говорилось о полисе", Action.SEARCH_EVENTS, None, "полисе"),
+        ("Найди ту запись, где упоминался страховой полис", Action.SEARCH_EVENTS, None, "страховой полис"),
+        ("Можешь поискать, что у меня было запланировано насчет полиса?", Action.SEARCH_EVENTS, None, "полиса"),
+        ("Посмотри, пожалуйста, что я собирался делать со страховым полисом", Action.SEARCH_EVENTS, EventType.TASK, "страховым полисом"),
+    ],
+)
+def test_new_wording_routes_to_deterministic_action(
+    text, expected_action, expected_type, expected_query
+):
+    command = AssistantCommand(
+        action=Action.CLARIFY,
+        transcript=text,
+        clarification_question="Уточните запрос",
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-30T16:00:00+03:00")
+    )
+
+    assert result.action == expected_action
+    assert result.event_type == expected_type
+    assert result.query == expected_query
+
+
+def test_earlier_meeting_wording_applies_past_filter():
+    now = datetime.fromisoformat("2026-10-30T16:00:00+03:00")
+    command = AssistantCommand(
+        action=Action.CLARIFY,
+        transcript="Были ли раньше встречи с архивариусом?",
+        clarification_question="Уточните запрос",
+    )
+
+    result = normalize_command(command, now)
+
+    assert result.action == Action.SEARCH_EVENTS
+    assert result.query == "архивариусом"
+    assert result.date_from is None
+    assert result.date_to == now

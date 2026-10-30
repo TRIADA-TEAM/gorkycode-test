@@ -41,6 +41,7 @@ NUMBER_WORDS = {
     "девять": 9,
     "десять": 10,
 }
+HOUR_WORDS = {**NUMBER_WORDS, "одному": 1, "двум": 2, "трем": 3, "десяти": 10}
 
 
 @dataclass(frozen=True)
@@ -70,7 +71,7 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
     date_span: tuple[int, int] | None = None
 
     relative_hours = re.search(
-        r"через\s+(\d+|" + "|".join(NUMBER_WORDS) + r")\s+час", text
+        r"(?:через|спустя)\s+(\d+|" + "|".join(NUMBER_WORDS) + r")\s+час", text
     )
     if relative_hours:
         raw_amount = relative_hours.group(1)
@@ -79,12 +80,16 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
         return ParsedDateTime(moment.date(), moment.timetz().replace(tzinfo=None), True, True)
 
     relative_minutes = re.search(
-        r"через\s+(\d+|" + "|".join(NUMBER_WORDS) + r")\s+минут", text
+        r"(?:через|спустя)\s+(\d+|" + "|".join(NUMBER_WORDS) + r")\s+минут", text
     )
     if relative_minutes:
         raw_amount = relative_minutes.group(1)
         amount = int(raw_amount) if raw_amount.isdigit() else NUMBER_WORDS[raw_amount]
         moment = now + timedelta(minutes=amount)
+        return ParsedDateTime(moment.date(), moment.timetz().replace(tzinfo=None), True, True)
+
+    if re.search(r"(?:через|спустя)\s+минут[уы]?\b", text):
+        moment = now + timedelta(minutes=1)
         return ParsedDateTime(moment.date(), moment.timetz().replace(tzinfo=None), True, True)
 
     if "до конца недели" in text:
@@ -177,9 +182,19 @@ def parse_datetime_parts(value: str, now: datetime) -> ParsedDateTime:
             if meridiem in {"дня", "вечера"} and hour_value < 12:
                 hour_value += 12
             time_value = time(hour_value, 0)
-        elif "полдень" in time_text:
+        else:
+            word_hour = re.search(
+                r"\b(?:в|к)\s+(" + "|".join(HOUR_WORDS) + r")\s*(утра|дня|вечера)?\b",
+                time_text,
+            )
+            if word_hour:
+                hour_value = HOUR_WORDS[word_hour.group(1)]
+                if word_hour.group(2) in {"дня", "вечера"} and hour_value < 12:
+                    hour_value += 12
+                time_value = time(hour_value, 0)
+        if time_value is None and "полдень" in time_text:
             time_value = time(12, 0)
-        elif "полноч" in time_text:
+        elif time_value is None and "полноч" in time_text:
             time_value = time(0, 0)
 
     return ParsedDateTime(
@@ -196,6 +211,9 @@ def parse_period(value: str, now: datetime) -> ParsedPeriod:
     """Resolve a list/search period without relying on provider date ranges."""
     text = " ".join(value.lower().replace("ё", "е").split())
     today = now.date()
+
+    if re.search(r"с\s+завтрашн\w*\s+дн\w*\s+по\s+послезавтра", text):
+        return ParsedPeriod(today + timedelta(days=1), today + timedelta(days=2))
 
     explicit_range = _parse_explicit_range(text, now)
     if explicit_range.start is not None:
@@ -216,7 +234,9 @@ def parse_period(value: str, now: datetime) -> ParsedPeriod:
         target = today + timedelta(days=1)
         return ParsedPeriod(target, target)
 
-    if "на следующей неделе" in text or "следующую неделю" in text:
+    if any(marker in text for marker in (
+        "на следующей неделе", "следующую неделю", "будущую неделю", "будущей неделе",
+    )):
         start = today + timedelta(days=7 - now.weekday())
         return ParsedPeriod(start, start + timedelta(days=6))
     if "в следующем месяце" in text or "на следующий месяц" in text:
@@ -225,7 +245,9 @@ def parse_period(value: str, now: datetime) -> ParsedPeriod:
         start = date(year, month, 1)
         end = date(year, month, calendar.monthrange(year, month)[1])
         return ParsedPeriod(start, end)
-    if "на этой неделе" in text or "эту неделю" in text:
+    if any(marker in text for marker in (
+        "на этой неделе", "эту неделю", "до конца этой недели", "до конца недели",
+    )):
         start = today - timedelta(days=now.weekday())
         return ParsedPeriod(start, start + timedelta(days=6))
 

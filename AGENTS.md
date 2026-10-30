@@ -205,6 +205,14 @@ Current provisional time rules:
 - an explicit new creation command (`добавь`, `создай`, `поставь`, `напомни`,
   `назначь`, `запланируй`) replaces an unfinished creation instead of inheriting
   its date or time. The new event must independently provide all required data;
+- a reply to an unfinished creation is merged only when it supplies one of the
+  fields currently being requested. A search, list, greeting, or unrelated
+  phrase clears that stale creation before interpretation, including after a
+  browser reload;
+- natural time variants `к десяти утра`, `спустя два часа`, and `через минуту`
+  are deterministic equivalents of their numeric forms. Period variants
+  `до конца этой недели`, `будущая неделя`, and `с завтрашнего дня по
+  послезавтра` preserve the complete intended calendar boundaries;
 - relative-date behavior will be refined later and must be covered by tests with
   a fixed application clock;
 - an unqualified weekday means the next occurrence strictly after today. On a
@@ -265,6 +273,9 @@ or `когда запланировано согласование догово�
 over generic list wording. Without a meaningful subject, a type/period question
 remains a list. In generic plural period questions, `дела` means all event
 types; singular `дело` in creation or targeted search continues to mean a task.
+Natural search/list aliases such as `отыщи`, `посмотри`, `отобрази`, `где`,
+`задание`, and `запись` are normalized only at the intent/query boundary. They
+must not be added to stored titles or otherwise change creation semantics.
 
 SQLite FTS5, embeddings, a vector database, and RAG are not required for this
 test project. Reconsider them only if deterministic search proves insufficient.

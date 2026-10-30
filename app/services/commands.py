@@ -193,7 +193,7 @@ def normalize_command(
             if "встреч" in text:
                 requested_types.append(EventType.MEETING)
             generic_deals = text.startswith("какие дела") or "дела намечены" in text
-            if "задач" in text or (
+            if "задач" in text or "задан" in text or (
                 not generic_deals and any(word.startswith("дел") for word in text.split())
             ):
                 requested_types.append(EventType.TASK)
@@ -210,7 +210,9 @@ def normalize_command(
             updates["event_types"] = []
         # Negative forms contain the positive stem ("невыполненные" includes
         # "выполнен"), so they must be recognized first.
-        if any(marker in text for marker in ("невыполн", "незаверш", "несделан")):
+        if any(marker in text for marker in (
+            "невыполн", "незаверш", "несделан", "не сделан", "не закрыт", "еще не сдел",
+        )):
             updates["statuses"] = [EventStatus.PENDING]
         elif any(marker in text for marker in ("выполнен", "завершен", "сделан", "готов")):
             updates["statuses"] = [EventStatus.COMPLETED]
@@ -252,7 +254,7 @@ TYPE_MARKERS = {
         "встреч", "созвон", "совещан", "переговор", "назначь встреч",
     ),
     EventType.TASK: (
-        "задач", "нужно сделать", "надо сделать", "добавь в задачи",
+        "задач", "задан", "нужно сделать", "надо сделать", "добавь в задачи",
     ),
 }
 
@@ -280,6 +282,8 @@ def _is_list_request(text: str) -> bool:
         "есть что-нибудь", "есть что нибудь", "есть ли что",
         "покажи завершенные", "покажи завершённые", "покажи готовые", "покажи сделанные",
         "мои планы",
+        "как выглядит мой план", "сегодня есть запланирован", "отобрази ",
+        "составь список", "что предстоит сделать", "что из встреч", "что из задач",
     )
     plural_list = bool(
         re.search(
@@ -298,19 +302,24 @@ def _is_list_request(text: str) -> bool:
 def _has_event_query_intent(text: str) -> bool:
     if _is_list_request(text):
         return True
-    event_words = ("событ", "задач", "дело", "дела", "напомин", "встреч", "план")
-    query_words = ("найди", "найти", "поиск", "покажи", "когда", "сколько", "есть ли", "что у меня")
+    event_words = ("событ", "задач", "задан", "запис", "дело", "дела", "напомин", "встреч", "план")
+    query_words = (
+        "найди", "найти", "отыщи", "разыщи", "поищи", "поиск", "посмотри",
+        "покажи", "отобрази", "когда", "где", "сколько", "есть ли", "что у меня",
+    )
     return any(word in text for word in event_words) and any(
         word in text for word in query_words
     )
 
 
 def _is_search_request(text: str) -> bool:
-    explicit_search = text.startswith(("найди ", "найти ", "поищи ", "поиск "))
+    explicit_search = bool(
+        re.search(r"\b(?:найди|найти|поищи|отыщи|разыщи|посмотри|поискать|поиск)\b", text)
+    )
     targeted_display = bool(
         re.search(
-            r"\bпокажи\s+(?:мне\s+)?(?:ту\s+|эту\s+|конкретную\s+)?"
-            r"(?:задачу|встречу|напоминание|событие)\b",
+            r"\bпокажи\s+(?:пожалуйста\s+)?(?:мне\s+)?(?:ту\s+|эту\s+|конкретную\s+)?"
+            r"(?:задачу|задание|запись|встречу|напоминание|событие)\b",
             text,
         )
         and extract_search_query(text)
@@ -319,6 +328,19 @@ def _is_search_request(text: str) -> bool:
         text.startswith("когда ")
         and "запланирован" in text
         and extract_search_query(text)
+    )
+    targeted_question = bool(
+        re.search(
+            r"^(?:где\b|в какой день\b|на какую дату\b|на какое время\b)", text
+        )
+        and any(word in text for word in ("задач", "задан", "запис", "встреч", "напомин", "провер"))
+        and extract_search_query(text)
+    )
+    historical_question = bool(
+        re.search(r"\b(?:были ли раньше|проходил\w*|состоял\w*)\b", text)
+        and any(word in text for word in ("встреч", "задач", "задан", "напомин"))
+        and extract_search_query(text)
+        and not _is_list_request(text)
     )
     natural_event_search = (
         ("когда" in text or "во сколько" in text)
@@ -340,6 +362,8 @@ def _is_search_request(text: str) -> bool:
         explicit_search
         or targeted_display
         or scheduled_subject
+        or targeted_question
+        or historical_question
         or natural_event_search
         or conversational_meeting_search
         or temporal_search
@@ -349,7 +373,7 @@ def _is_search_request(text: str) -> bool:
 def _temporal_direction(text: str) -> str | None:
     if re.search(
         r"\b(?:был|была|было|были|прошл\w*|прошедш\w*|предыдущ\w*|"
-        r"минувш\w*|состоявш\w*|состоял\w*|завершивш\w*)\b",
+        r"минувш\w*|состоявш\w*|состоял\w*|проходил\w*|завершивш\w*|раньше)\b",
         text,
     ):
         return "past"

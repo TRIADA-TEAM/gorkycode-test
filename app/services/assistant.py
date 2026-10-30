@@ -78,12 +78,18 @@ class AssistantService:
         if pending and self._is_new_non_event_intent(text):
             self.dialogue.clear_pending(session_id)
             pending = None
+        if pending and self._is_explicit_new_creation_text(text):
+            self.dialogue.clear_pending(session_id)
+            pending = None
         if pending and self._should_cancel_pending(text, pending):
             return self.execute(
                 session_id,
                 AssistantCommand(action=Action.CANCEL_ACTION, transcript=text),
                 "user_text",
             )
+        if pending and not self._is_pending_answer(text, pending):
+            self.dialogue.clear_pending(session_id)
+            pending = None
         preflight = self._preflight_text(session_id, text, "user_text")
         if preflight:
             return preflight
@@ -694,6 +700,34 @@ class AssistantService:
             "запланируй", "добавить", "создать", "поставить",
         )
         return any(marker in text.split() for marker in creation_markers)
+
+    @staticmethod
+    def _is_explicit_new_creation_text(value: str) -> bool:
+        words = set(normalize_text(value).split())
+        return bool(
+            words
+            & {
+                "добавь", "создай", "поставь", "напомни", "назначь",
+                "запланируй", "добавить", "создать", "поставить",
+            }
+        )
+
+    def _is_pending_answer(self, value: str, pending: dict) -> bool:
+        missing = set(pending.get("missing_fields", []))
+        if not missing:
+            return False
+        if missing & {"target_event", "update_details", "conflict_confirmation"}:
+            return True
+        parsed = parse_datetime_parts(value, self._now())
+        expects_time = bool(missing & {"invalid_time", "due_time", "start_time", "future_datetime"})
+        expects_date = bool(missing & {"invalid_date", "due_date", "start_date", "future_datetime"})
+        if expects_time and (parsed.has_explicit_time or parsed.invalid_time):
+            return True
+        if expects_date and (parsed.has_explicit_date or parsed.invalid_date):
+            return True
+        if "title" in missing:
+            return not parsed.has_explicit_date and not parsed.has_explicit_time
+        return False
 
     @staticmethod
     def _merge_management_pending(
