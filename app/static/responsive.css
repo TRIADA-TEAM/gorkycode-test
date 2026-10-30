@@ -479,6 +479,10 @@ body {
 
 
 /* The descriptive product name is longer than the original short headline. */
+.mobile-title-break {
+  display: none;
+}
+
 @media (min-width: 561px) and (max-width: 899px) {
   .conversation-intro h1 {
     font-size: clamp(30px, 5vw, 40px);
@@ -487,6 +491,10 @@ body {
 }
 
 @media (max-width: 560px) {
+  .mobile-title-break {
+    display: block;
+  }
+
   .conversation-intro h1 {
     font-size: clamp(24px, 7.2vw, 30px);
     line-height: 1.1;

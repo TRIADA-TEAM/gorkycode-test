@@ -59,6 +59,7 @@ def test_html_and_assets_disable_stale_browser_cache():
 
 def test_mobile_chat_collapse_assets_are_served():
     with TestClient(app) as client:
+        page = client.get("/")
         script = client.get("/static/app.js")
         responsive = client.get("/static/responsive.css")
 
@@ -71,6 +72,8 @@ def test_mobile_chat_collapse_assets_are_served():
     assert ".mobile-chat-scrolled .topbar" in responsive.text
     assert "overflow-anchor: none" in responsive.text
     assert "font-size: clamp(24px, 7.2vw, 30px)" in responsive.text
+    assert 'class="mobile-title-break"' in page.text
+    assert ".mobile-title-break" in responsive.text
 
 
 def test_browser_history_and_readable_validation_assets_are_served():
