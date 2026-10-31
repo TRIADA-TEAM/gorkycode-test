@@ -36,7 +36,8 @@ def test_desktop_split_layout_assets_are_served():
     assert page.status_code == 200
     assert "Голосовой помощник для задач, встреч и напоминаний" in page.text
     assert "Сделано командой «Триада» для GorkyCode." in page.text
-    assert page.text.count('class="suggestion-chip"') == 2
+    assert page.text.count('class="suggestion-chip"') == 3
+    assert "Покажи расписание на завтра" in page.text
     assert page.text.index('class="suggestions"') < page.text.index('id="chat"')
     assert styles.status_code == 200
     assert 'desktop-layout.css' in styles.text
@@ -84,6 +85,18 @@ def test_browser_history_and_readable_validation_assets_are_served():
     assert "restoreChatHistory();" in script.text
     assert 'addMessage("assistant", "Введите название.")' in script.text
     assert "Value error" in script.text
+
+
+def test_day_schedule_frontend_assets_are_served():
+    with TestClient(app) as client:
+        script = client.get("/static/app.js")
+        components = client.get("/static/components.css")
+
+    assert 'viewMode === "day_schedule"' in script.text
+    assert "createScheduleCard(events, scheduleDate)" in script.text
+    assert "message.schedule_date || null" in script.text
+    assert ".schedule-card" in components.text
+    assert ".schedule-item.schedule-meeting" in components.text
 
 
 def test_text_endpoint_preserves_clarification_between_requests(db, monkeypatch):

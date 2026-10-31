@@ -118,12 +118,14 @@ function loadChatHistory() {
   }
 }
 
-function saveChatMessage(role, messageText, events, timestamp) {
+function saveChatMessage(role, messageText, events, timestamp, viewMode, scheduleDate) {
   const history = loadChatHistory();
   history.push({
     role,
     text: messageText,
     events,
+    view_mode: viewMode,
+    schedule_date: scheduleDate,
     timestamp: timestamp.toISOString(),
   });
   try {
@@ -162,17 +164,30 @@ function restoreChatHistory() {
       Array.isArray(message.events) ? message.events : [],
       Number.isNaN(timestamp.getTime()) ? new Date() : timestamp,
       false,
+      String(message.view_mode || "default"),
+      message.schedule_date || null,
     );
   }
 }
 
-function addMessage(role, text, events = [], timestamp = new Date(), persist = true) {
+function addMessage(
+  role,
+  text,
+  events = [],
+  timestamp = new Date(),
+  persist = true,
+  viewMode = "default",
+  scheduleDate = null,
+) {
   const article = document.createElement("article");
   article.className = `message ${role}`;
   const p = document.createElement("p");
   p.textContent = text;
   article.appendChild(p);
-  if (events.length) {
+  if (viewMode === "day_schedule") {
+    article.classList.add("schedule-message");
+    article.appendChild(createScheduleCard(events, scheduleDate));
+  } else if (events.length) {
     const list = document.createElement("div");
     list.className = "events";
     for (const event of events) {
@@ -189,7 +204,107 @@ function addMessage(role, text, events = [], timestamp = new Date(), persist = t
   chat.appendChild(article);
   chat.scrollTop = chat.scrollHeight;
   updateMobileChrome();
-  if (persist) saveChatMessage(role, text, events, timestamp);
+  if (persist) {
+    saveChatMessage(role, text, events, timestamp, viewMode, scheduleDate);
+  }
+}
+
+function createScheduleCard(events, scheduleDate) {
+  const card = document.createElement("section");
+  card.className = "schedule-card";
+
+  const heading = document.createElement("div");
+  heading.className = "schedule-heading";
+  const eyebrow = document.createElement("span");
+  eyebrow.textContent = "Расписание дня";
+  const title = document.createElement("strong");
+  title.textContent = formatScheduleDate(scheduleDate);
+  const count = document.createElement("small");
+  count.textContent = formatScheduleCount(events.length);
+  heading.append(eyebrow, title, count);
+  card.appendChild(heading);
+
+  const timed = events
+    .filter((event) => event.starts_at || event.due_at)
+    .sort((left, right) => eventMoment(left) - eventMoment(right));
+  const allDay = events.filter((event) => !event.starts_at && !event.due_at);
+
+  if (!events.length) {
+    const empty = document.createElement("p");
+    empty.className = "schedule-empty";
+    empty.textContent = "Свободный день — событий пока нет.";
+    card.appendChild(empty);
+    return card;
+  }
+
+  if (timed.length) {
+    const timeline = document.createElement("div");
+    timeline.className = "schedule-timeline";
+    timed.forEach((event) => timeline.appendChild(createScheduleItem(event)));
+    card.appendChild(timeline);
+  }
+
+  if (allDay.length) {
+    const section = document.createElement("div");
+    section.className = "schedule-all-day";
+    const label = document.createElement("span");
+    label.textContent = "В течение дня";
+    section.appendChild(label);
+    allDay.forEach((event) => section.appendChild(createScheduleItem(event, true)));
+    card.appendChild(section);
+  }
+  return card;
+}
+
+function createScheduleItem(event, allDay = false) {
+  const item = document.createElement("div");
+  item.className = `schedule-item schedule-${event.type}`;
+  const time = document.createElement("time");
+  time.textContent = allDay ? "•" : formatScheduleTime(event);
+  const body = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = event.title;
+  const type = document.createElement("small");
+  type.textContent = scheduleTypeLabel(event.type);
+  body.append(title, type);
+  item.append(time, body);
+  return item;
+}
+
+function eventMoment(event) {
+  return new Date(event.starts_at || event.due_at).getTime();
+}
+
+function formatScheduleTime(event) {
+  const start = new Date(event.starts_at || event.due_at);
+  const options = {hour: "2-digit", minute: "2-digit", timeZone: MESSAGE_TIME_ZONE};
+  const startText = start.toLocaleTimeString("ru-RU", options);
+  if (event.type === "meeting" && event.ends_at) {
+    return `${startText}–${new Date(event.ends_at).toLocaleTimeString("ru-RU", options)}`;
+  }
+  return startText;
+}
+
+function formatScheduleDate(value) {
+  if (!value) return "Выбранный день";
+  const date = new Date(`${value}T00:00:00+03:00`);
+  const formatted = date.toLocaleDateString("ru-RU", {
+    weekday: "long", day: "numeric", month: "long", timeZone: MESSAGE_TIME_ZONE,
+  });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+function formatScheduleCount(count) {
+  const ending = count % 10 === 1 && count % 100 !== 11
+    ? "событие"
+    : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)
+      ? "события"
+      : "событий";
+  return `${count} ${ending}`;
+}
+
+function scheduleTypeLabel(type) {
+  return {task: "Задача", reminder: "Напоминание", meeting: "Встреча"}[type] || "Событие";
 }
 
 function createEventCard(event) {
@@ -374,7 +489,15 @@ async function parseResponse(response) {
 
 function showAssistantResult(data) {
   const events = data.created_event ? [data.created_event] : data.events;
-  addMessage("assistant", data.reply, events || []);
+  addMessage(
+    "assistant",
+    data.reply,
+    events || [],
+    new Date(),
+    true,
+    data.view_mode || "default",
+    data.schedule_date || null,
+  );
   if (speakToggle.checked && "speechSynthesis" in window) {
     speechSynthesis.cancel();
     speechSynthesis.speak(new SpeechSynthesisUtterance(data.reply));

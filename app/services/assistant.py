@@ -24,6 +24,7 @@ from app.services.commands import (
     _is_search_request,
     clarification_question,
     detect_event_type,
+    is_day_schedule_request,
     normalize_command,
 )
 from app.services.datetime_parser import combine, parse_datetime_parts
@@ -93,6 +94,10 @@ class AssistantService:
         preflight = self._preflight_text(session_id, text, "user_text")
         if preflight:
             return preflight
+        if is_day_schedule_request(text):
+            command = AssistantCommand(action=Action.LIST_EVENTS, transcript=text)
+            command = self._normalize_and_log(command, pending, source_text=text)
+            return self.execute(session_id, command, "user_text")
         if _is_search_request(normalize_text(text)):
             command = AssistantCommand(
                 action=Action.SEARCH_EVENTS,
@@ -128,6 +133,12 @@ class AssistantService:
                 AssistantCommand(action=Action.CANCEL_ACTION, transcript=transcript),
                 "user_audio",
             )
+        if is_day_schedule_request(transcript):
+            command = AssistantCommand(action=Action.LIST_EVENTS, transcript=transcript)
+            command = self._normalize_and_log(
+                command, pending, source_text=transcript
+            )
+            return self.execute(session_id, command, "user_audio")
         command = await self.client.interpret(
             text=transcript,
             now_iso=self._now_iso(),
@@ -206,6 +217,19 @@ class AssistantService:
                 created_event=EventResponse.model_validate(event),
             )
         if command.action == Action.LIST_EVENTS:
+            schedule_view = is_day_schedule_request(command.transcript)
+            if (
+                schedule_view
+                and command.date_from
+                and command.date_to
+                and command.date_from.date() != command.date_to.date()
+            ):
+                return AssistantResponse(
+                    reply="Для карточки расписания укажите один конкретный день.",
+                    action=Action.CLARIFY.value,
+                    transcript=command.transcript,
+                    needs_clarification=True,
+                )
             events = self.events.list_events(
                 session_id,
                 command.date_from,
@@ -217,12 +241,24 @@ class AssistantService:
             self.dialogue.clear_pending(session_id)
             if len(events) == 1:
                 self.dialogue.set_last_referenced_event_id(session_id, events[0].id)
-            reply = list_reply(len(events), command.event_type)
+            reply = (
+                "Вот расписание на выбранный день."
+                if events and schedule_view
+                else "На этот день ничего не запланировано."
+                if schedule_view
+                else list_reply(len(events), command.event_type)
+            )
             return AssistantResponse(
                 reply=reply,
                 action=command.action.value,
                 transcript=command.transcript,
                 events=[EventResponse.model_validate(event) for event in events],
+                view_mode="day_schedule" if schedule_view else "default",
+                schedule_date=(
+                    command.date_from.date()
+                    if schedule_view and command.date_from
+                    else None
+                ),
             )
         if command.action == Action.SEARCH_EVENTS:
             events = self.events.search_events(
@@ -258,6 +294,17 @@ class AssistantService:
                 transcript=text,
             )
         parsed = parse_datetime_parts(text, self._now())
+        if (
+            is_day_schedule_request(text)
+            and any(word in normalized.split() for word in ("карточка", "карточку"))
+            and not parsed.has_explicit_date
+        ):
+            return AssistantResponse(
+                reply="На какой день показать карточку расписания?",
+                action=Action.CLARIFY.value,
+                transcript=text,
+                needs_clarification=True,
+            )
         if parsed.invalid_date:
             return AssistantResponse(
                 reply="Указанная дата не существует. Проверьте число, месяц и год.",

@@ -1,5 +1,6 @@
 from datetime import date, datetime, time
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -115,3 +116,5 @@ class AssistantResponse(BaseModel):
     events: list[EventResponse] = Field(default_factory=list)
     created_event: EventResponse | None = None
     needs_clarification: bool = False
+    view_mode: Literal["default", "day_schedule"] = "default"
+    schedule_date: date | None = None

@@ -861,6 +861,46 @@ def test_future_search_is_limited_to_events_after_current_time():
 
 
 @pytest.mark.parametrize(
+    ("text", "expected_day"),
+    [
+        ("Покажи расписание на завтра", "2026-10-16"),
+        ("Составь карточку на 20 октября", "2026-10-20"),
+        ("Как выглядит мой день сегодня?", "2026-10-15"),
+        ("Покажи план дня", "2026-10-15"),
+    ],
+)
+def test_day_schedule_wordings_are_single_day_lists(text, expected_day):
+    now = datetime.fromisoformat("2026-10-15T12:00:00+03:00")
+    command = AssistantCommand(
+        action=Action.CLARIFY,
+        transcript=text,
+        clarification_question="Уточните запрос",
+    )
+
+    result = normalize_command(command, now)
+
+    assert result.action == Action.LIST_EVENTS
+    assert result.date_from.date().isoformat() == expected_day
+    assert result.date_to.date().isoformat() == expected_day
+
+
+def test_schedule_word_in_creation_does_not_turn_task_into_list():
+    command = AssistantCommand(
+        action=Action.CREATE_TASK,
+        transcript="Создай задачу составить карточку расписания завтра",
+        title="Составить карточку расписания",
+        event_type=EventType.TASK,
+    )
+
+    result = normalize_command(
+        command, datetime.fromisoformat("2026-10-15T12:00:00+03:00")
+    )
+
+    assert result.action == Action.CREATE_TASK
+    assert result.event_type == EventType.TASK
+
+
+@pytest.mark.parametrize(
     ("text", "expected_action", "expected_type", "expected_query"),
     [
         ("Как выглядит мой план на сегодня?", Action.LIST_EVENTS, None, None),

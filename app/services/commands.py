@@ -222,6 +222,17 @@ def normalize_command(
 
         if now:
             relative_period = _relative_period(source_text or command.transcript, now)
+            if (
+                command.action == Action.LIST_EVENTS
+                and is_day_schedule_request(source_text or command.transcript)
+                and relative_period["date_from"] is None
+            ):
+                relative_period = {
+                    "date_from": datetime.combine(now.date(), time.min, tzinfo=now.tzinfo),
+                    "date_to": datetime.combine(
+                        now.date(), time(23, 59, 59), tzinfo=now.tzinfo
+                    ),
+                }
             if relative_period["date_from"] is not None:
                 updates.update(relative_period)
             elif direction := _temporal_direction(text):
@@ -296,6 +307,7 @@ def _is_list_request(text: str) -> bool:
         any(marker in text for marker in list_markers)
         or text.startswith("какие ")
         or plural_list
+        or is_day_schedule_request(text)
     )
 
 
@@ -309,6 +321,26 @@ def _has_event_query_intent(text: str) -> bool:
     )
     return any(word in text for word in event_words) and any(
         word in text for word in query_words
+    )
+
+
+def is_day_schedule_request(value: str) -> bool:
+    text = normalize_text(value)
+    explicit_creation = bool(
+        re.search(r"\b(?:добавь|создай|поставь|напомни|назначь|запланируй)\b", text)
+        and re.search(r"\b(?:задач\w*|встреч\w*|напоминан\w*)\b", text)
+    )
+    if explicit_creation:
+        return False
+    return bool(
+        re.search(
+            r"\b(?:покажи|выведи|отобрази|составь|сформируй)\b.*"
+            r"\b(?:расписан\w*|карточк\w*|план\s+дня)\b",
+            text,
+        )
+        or re.search(r"^(?:мое\s+)?расписание\b", text)
+        or text.startswith("план дня")
+        or "как выглядит мой день" in text
     )
 
 

@@ -553,6 +553,93 @@ def test_greeting_clears_unfinished_creation(db):
     assert assistant.dialogue.get_pending(session_id) is None
 
 
+def test_day_schedule_is_built_without_language_model(db):
+    session_id = str(uuid4())
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+    service.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_MEETING,
+            transcript="Встреча завтра в 15:00",
+            title="Встреча с командой",
+            event_type=EventType.MEETING,
+            starts_at=datetime.fromisoformat("2026-10-16T15:00:00+03:00"),
+        ),
+        "user_text",
+    )
+    service.execute(
+        session_id,
+        AssistantCommand(
+            action=Action.CREATE_TASK,
+            transcript="Задача на завтра",
+            title="Подготовить презентацию",
+            event_type=EventType.TASK,
+            due_date=datetime.fromisoformat("2026-10-16").date(),
+        ),
+        "user_text",
+    )
+
+    result = asyncio.run(
+        service.handle_text(session_id, "Покажи расписание на завтра")
+    )
+
+    assert result.view_mode == "day_schedule"
+    assert result.schedule_date.isoformat() == "2026-10-16"
+    assert [event.title for event in result.events] == [
+        "Подготовить презентацию",
+        "Встреча с командой",
+    ]
+
+
+def test_empty_day_schedule_keeps_schedule_view(db):
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+
+    result = asyncio.run(
+        service.handle_text(str(uuid4()), "Покажи расписание на завтра")
+    )
+
+    assert result.reply == "На этот день ничего не запланировано."
+    assert result.view_mode == "day_schedule"
+    assert result.events == []
+
+
+def test_schedule_card_without_date_asks_for_day(db):
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+
+    result = asyncio.run(service.handle_text(str(uuid4()), "Покажи карточку"))
+
+    assert result.needs_clarification is True
+    assert result.reply == "На какой день показать карточку расписания?"
+
+
+def test_schedule_card_rejects_multi_day_period(db):
+    service = AssistantService(db, Settings(), ScriptedClient([]), lambda: NOW)
+
+    result = asyncio.run(
+        service.handle_text(str(uuid4()), "Покажи расписание на следующую неделю")
+    )
+
+    assert result.needs_clarification is True
+    assert result.reply == "Для карточки расписания укажите один конкретный день."
+
+
+def test_audio_schedule_uses_same_deterministic_view(db):
+    service = AssistantService(
+        db,
+        Settings(),
+        ScriptedClient([]),
+        lambda: NOW,
+        transcription_client=ScriptedTranscriber(["Покажи расписание на завтра"]),
+    )
+
+    result = asyncio.run(
+        service.handle_audio(str(uuid4()), "schedule.webm", b"audio", "audio/webm")
+    )
+
+    assert result.view_mode == "day_schedule"
+    assert result.schedule_date.isoformat() == "2026-10-16"
+
+
 def test_search_after_invalid_creation_does_not_execute_stale_pending(db):
     session_id = str(uuid4())
     client = ScriptedClient([

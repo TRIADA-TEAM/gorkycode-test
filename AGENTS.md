@@ -68,6 +68,13 @@ Out of scope for the first version:
 - The browser keeps up to 60 recent user/assistant messages per anonymous
   session in `localStorage` and restores them after reload. Event updates,
   completion, and deletion also update or remove stored event cards.
+- A one-day list request such as `покажи расписание на завтра`, `план дня`, or
+  `составь карточку на 1 ноября` uses the existing `list_events` action and is
+  rendered as one responsive schedule card. Timed events form a chronological
+  timeline; tasks without a time appear under `В течение дня`. The card and its
+  presentation metadata are restored from browser history. A bare card request
+  asks for a date, while a multi-day schedule asks for one specific day. This
+  feature does not generate or download PNG files.
 - The index injects a content-derived version into the main JS/CSS URLs, and
   prototype HTML/static responses use `Cache-Control: no-store`. This prevents
   stale frontend code after deployment while the prototype is under review.
